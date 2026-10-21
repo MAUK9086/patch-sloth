@@ -39,6 +39,7 @@ class FeatureBuilder:
         self.cwe_vocab = sorted(set(top_cwe) | {"other"})
         self.tfidf = TfidfVectorizer(min_df=self.min_df, max_features=30000, sublinear_tf=True).fit(train.description)
         self.svd = TruncatedSVD(self.n_text, random_state=0).fit(self.tfidf.transform(train.description))
+        self.medians = self.transform(train).median()  # occlusion baseline for explanations
         return self
 
     @property

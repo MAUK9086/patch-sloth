@@ -21,6 +21,16 @@
   ],
   "roc_auc": 0.9025689481172889,
   "brier": 0.05922594996054297,
-  "precision_at_top10pct": 0.5293159609120521
+  "precision_at_top10pct": 0.5293159609120521,
+  "recall_at_tau": 0.8635566467905997,
+  "precision_at_tau": 0.28681267474370925
+ },
+ "thresholds": {
+  "tau": 0.07172519219311888,
+  "tau_high": 0.44152513640273766,
+  "model": "hgb",
+  "tuned_on": "val published >= 2025-09-30",
+  "n_tune": 5614,
+  "base_rate_tune": 0.19077306733167082
  }
 }

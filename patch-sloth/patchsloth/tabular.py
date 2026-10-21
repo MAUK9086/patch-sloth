@@ -51,6 +51,27 @@ def choose_tau(y, p, min_precision: float = 0.5, top_frac: float | None = None) 
     return float(np.quantile(p, 1 - (top_frac or 0.1)))
 
 
+_GROUP_NAMES = {"cna_score": "CNA base score", "cna_id": "CNA (who scored it)", "cwe": "CNA weakness (CWE)",
+                "adp_scored": "scored by CISA-ADP", "desc_len": "description length", "has_v40": "has CVSS v4.0",
+                "n_refs": "references", "ref_github": "references", "ref_exploitdb": "references"}
+
+
+def feature_groups(names: list[str]) -> dict[str, list[str]]:
+    """Human-readable groups: each CNA vector field, the description text, references, LLM opinion."""
+    groups: dict[str, list[str]] = {}
+    for n in names:
+        if n.startswith("txt"):
+            g = "description text"
+        elif n.startswith("llm_"):
+            g = "fine-tuned LLM opinion"
+        elif n.startswith("cna_") and n[4:] in ("AV", "AC", "PR", "UI", "S", "C", "I", "A"):
+            g = f"CNA vector {n[4:]}"
+        else:
+            g = _GROUP_NAMES.get(n, n)
+        groups.setdefault(g, []).append(n)
+    return groups
+
+
 class BumpModel:
     """Fitted features + classifier, as used at serve time."""
 
@@ -59,6 +80,17 @@ class BumpModel:
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         return predict_proba(self.clf, self.fb.transform(df))
+
+    def explain(self, row: pd.DataFrame, top: int = 5) -> list[dict]:
+        """Occlusion: p_bump change when a feature group is reset to its training median. One row in."""
+        X = self.fb.transform(row)
+        p0 = float(predict_proba(self.clf, X)[0])
+        out = []
+        for group, cols in feature_groups(self.fb.feature_names).items():
+            Xo = X.copy()
+            Xo[cols] = self.fb.medians[cols].to_numpy()
+            out.append(dict(feature=group, contribution=round(p0 - float(predict_proba(self.clf, Xo)[0]), 3)))
+        return sorted(out, key=lambda d: -abs(d["contribution"]))[:top]
 
     def save(self, path: Path | None = None) -> Path:
         path = Path(path or MODELS / f"bump_{self.name}.joblib")
