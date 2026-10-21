@@ -1,7 +1,8 @@
 """Shared evaluation for every Task A model, so all baselines are scored identically."""
 import numpy as np
 from sklearn.metrics import average_precision_score, precision_recall_fscore_support
-from .cvss import METRICS, parse, base_score, sev_rank
+
+from .cvss import METRICS, base_score, parse, sev_rank
 
 
 def evaluate(df, pred_vectors, bump_proba=None, n_boot=1000, seed=0):

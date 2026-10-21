@@ -1,12 +1,15 @@
 """Task A baselines: copy-CNA, per-metric logistic regression on TF-IDF + CNA fields,
 and a direct 'bump-up' classifier. Writes results/baselines_<split>.json."""
-import json, sys
+import json
+import sys
 from pathlib import Path
-import numpy as np, pandas as pd
+
+import pandas as pd
 from scipy.sparse import hstack
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import OneHotEncoder
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from patchsloth.cvss import METRICS, parse, to_vector
 from patchsloth.metrics import evaluate, mcnemar
@@ -14,8 +17,8 @@ from patchsloth.metrics import evaluate, mcnemar
 df = pd.read_parquet("data/cves.parquet")
 df = df[df.split.isin(["train", "val", "test"])].copy()
 for k in METRICS:
-    df[f"cna_{k}"] = df.cna_vector.map(lambda v: parse(v)[k])
-    df[f"lab_{k}"] = df.label_vector.map(lambda v: parse(v)[k])
+    df[f"cna_{k}"] = df.cna_vector.map(lambda v, k=k: parse(v)[k])
+    df[f"lab_{k}"] = df.label_vector.map(lambda v, k=k: parse(v)[k])
 df["cwe1"] = df.cna_cwe.fillna("").str.split(";").str[0]
 tr = df[df.split == "train"]
 

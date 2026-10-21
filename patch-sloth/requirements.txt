@@ -1,7 +1,24 @@
+# core data + models (CPU)
 pandas
 pyarrow
 scikit-learn
 scipy
+joblib
+# LLM training/serving clients
 tinker
 tinker-cookbook
-tabpfn
+openai
+# product
+packaging
+semver
+jinja2
+fastapi
+uvicorn
+python-multipart
+httpx
+typer
+python-dotenv
+# dev
+pytest
+ruff
+# GPU-only extras (TabPFN, torch) live in requirements-gpu.txt

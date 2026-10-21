@@ -4,8 +4,10 @@ NOTE: written against the Tinker low-level API (ServiceClient / forward_backward
 sampling client). Check names against the current docs before the first run - run with --dry_run first.
 Usage: python scripts/05_tinker_train.py --epochs 1 --eval_n 8000
 """
-import argparse, json, random, sys
-from pathlib import Path
+import argparse
+import json
+import random
+
 import tinker
 from tinker import types
 from tinker_cookbook import renderers

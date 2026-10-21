@@ -1,5 +1,11 @@
-data/
-__pycache__/
+# anchored with a leading / so they don't match patchsloth/data/
+/data/
+/feed/
+/osv-db/
+/adapter/
+/peft_adapter/
 .env
-adapter/
-peft_adapter/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/

@@ -1,0 +1,4 @@
+# Install on the GPU workstation, after `pip install -r requirements.txt`
+# and after installing torch for your CUDA version (https://pytorch.org/get-started/locally/).
+-r requirements.txt
+tabpfn
