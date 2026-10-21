@@ -1,0 +1,12 @@
+rows 239058
+split
+train                 80098
+None                  67620
+deferred_unlabeled    48979
+test                  30706
+val                   11655
+
+per split: n, NVD wrote own score, vector changed, severity bumped UP, bumped DOWN
+test 30706 0.223 0.191 0.093 0.025
+train 80098 0.739 0.421 0.182 0.07
+val 11655 0.448 0.373 0.227 0.052

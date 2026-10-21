@@ -1,0 +1,14 @@
+== val (n=11655) ==
+             severity_acc exact_vector score_mae bump_precision bump_recall   bump_f1
+copy_cna          0.72115     0.626855  0.767482            0.0         0.0       0.0
+tfidf_logreg     0.821879     0.707851  0.428263       0.722084    0.879486  0.793051
+bump PR-AUC (direct classifier): 0.884 base rate 0.227
+per-metric acc copy vs LR: {'AV': (np.float64(0.973), np.float64(0.985)), 'AC': (np.float64(0.96), np.float64(0.969)), 'PR': (np.float64(0.913), np.float64(0.904)), 'UI': (np.float64(0.971), np.float64(0.975)), 'S': (np.float64(0.932), np.float64(0.963)), 'C': (np.float64(0.751), np.float64(0.917)), 'I': (np.float64(0.79), np.float64(0.922)), 'A': (np.float64(0.807), np.float64(0.935))}
+McNemar: {'a_only': 2340, 'b_only': 1166, 'p_value': 2.424136032798483e-87}
+== test (n=30706) ==
+             severity_acc exact_vector score_mae bump_precision bump_recall   bump_f1
+copy_cna         0.882043     0.808995  0.320058            0.0         0.0       0.0
+tfidf_logreg     0.835993     0.708559  0.418078       0.483781     0.66959  0.561718
+bump PR-AUC (direct classifier): 0.517 base rate 0.093
+per-metric acc copy vs LR: {'AV': (np.float64(0.984), np.float64(0.969)), 'AC': (np.float64(0.946), np.float64(0.941)), 'PR': (np.float64(0.96), np.float64(0.933)), 'UI': (np.float64(0.975), np.float64(0.969)), 'S': (np.float64(0.963), np.float64(0.946)), 'C': (np.float64(0.933), np.float64(0.934)), 'I': (np.float64(0.939), np.float64(0.936)), 'A': (np.float64(0.93), np.float64(0.941))}
+McNemar: {'a_only': 1951, 'b_only': 3365, 'p_value': 1.1425210124725688e-83}

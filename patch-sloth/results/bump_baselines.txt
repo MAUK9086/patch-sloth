@@ -1,0 +1,6 @@
+--- logreg
+val {'n': np.int64(11655), 'base_rate': np.float64(0.227), 'pr_auc': np.float64(0.8), 'pr_auc_ci95': (np.float64(0.782), np.float64(0.82)), 'roc_auc': np.float64(0.938), 'brier': np.float64(0.08), 'precision_at_top10pct': np.float64(0.876)}
+test {'n': np.int64(30706), 'base_rate': np.float64(0.093), 'pr_auc': np.float64(0.449), 'pr_auc_ci95': (np.float64(0.428), np.float64(0.47)), 'roc_auc': np.float64(0.866), 'brier': np.float64(0.069), 'precision_at_top10pct': np.float64(0.457)}
+--- hgb
+val {'n': np.int64(11655), 'base_rate': np.float64(0.227), 'pr_auc': np.float64(0.898), 'pr_auc_ci95': (np.float64(0.889), np.float64(0.908)), 'roc_auc': np.float64(0.96), 'brier': np.float64(0.061), 'precision_at_top10pct': np.float64(0.967)}
+test {'n': np.int64(30706), 'base_rate': np.float64(0.093), 'pr_auc': np.float64(0.58), 'pr_auc_ci95': (np.float64(0.561), np.float64(0.599)), 'roc_auc': np.float64(0.903), 'brier': np.float64(0.059), 'precision_at_top10pct': np.float64(0.529)}
