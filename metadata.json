@@ -1,0 +1,49 @@
+{
+  "cli_version": "0.11.6",
+  "checkpoint_id": "01M5FE7Z46WGV4Q1WPBEMX6FSP",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "patch-sloth/.env.example",
+    "patch-sloth/.gitignore",
+    "patch-sloth/DECISIONS.md",
+    "patch-sloth/patchsloth/config.py",
+    "patch-sloth/patchsloth/data/__init__.py",
+    "patch-sloth/patchsloth/data/epss.py",
+    "patch-sloth/patchsloth/data/nvd.py",
+    "patch-sloth/patchsloth/features.py",
+    "patch-sloth/patchsloth/llm/__init__.py",
+    "patch-sloth/patchsloth/llm/backends.py",
+    "patch-sloth/patchsloth/llm/prompt.py",
+    "patch-sloth/patchsloth/tabular.py",
+    "patch-sloth/pyproject.toml",
+    "patch-sloth/requirements-gpu.txt",
+    "patch-sloth/requirements.txt",
+    "patch-sloth/scripts/02_build_dataset.py",
+    "patch-sloth/scripts/03_baselines.py",
+    "patch-sloth/scripts/04_make_tinker_data.py",
+    "patch-sloth/scripts/06_eval_llm.py",
+    "patch-sloth/scripts/07_tabpfn_bump.py",
+    "patch-sloth/tests/test_cvss.py",
+    "patch-sloth/tests/test_features.py",
+    "patch-sloth/tests/test_label_rule.py",
+    "patch-sloth/tests/test_prompt.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 104,
+    "cache_creation_tokens": 135893,
+    "cache_read_tokens": 6618633,
+    "output_tokens": 51624,
+    "api_call_count": 52
+  }
+}

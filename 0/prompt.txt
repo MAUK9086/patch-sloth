@@ -1,0 +1,37 @@
+<pasted_content id="5350">
+Read CLAUDE.md and SPEC.md fully before doing anything.
+
+My setup tonight: Windows laptop, PowerShell, conda (base env), NO GPU. GPU steps (TabPFN at scale, vLLM) happen tomorrow on a workstation, so skip them tonight.
+
+Tonight's scope, in this order:
+1. M0 from SPEC §15: create a conda env "patchsloth" (Python 3.11), refactor shared logic into the patchsloth package per §6, create DECISIONS.md and .env.example, and write tests for cvss, the label rule (including the NaN regression), features (leakage), and prompt parsing. pytest must pass.
+2. M1 on CPU: run scripts/01_download.sh (adapt it to PowerShell or Python if bash isn't available), then 02, 03 and 07 with --model hgb. Compare against the numbers in SPEC §2 and §9.2 and commit results/.
+3. CPU-only parts of M5: scan.py (fallback GHSA matcher first; osv-scanner if it's easy to install on Windows), priority.py, report.py (Ultramarine with guardrail plus template fallback; use the template if there's no API key yet), the NullBackend and HGB-only path, api.py, cli.py, web/index.html, and the fixtures and tests from §14.
+
+Rules:
+- Before writing code, show me a short plan of what you'll change.
+- Commit after each milestone with a clear message.
+- Stop at any [HUMAN] step and tell me exactly what to do.
+- VERIFY third-party APIs against their docs, as the spec says.
+- Log every decision in DECISIONS.md.
+</pasted_content id="5350">
+
+---
+
+<task-notification>
+<task-id>bl77b1v4s</task-id>
+<tool-use-id>toolu_01UcVKZ2KYano2LCkkHeF7rJ</tool-use-id>
+<output-file>C:\Users\maukh\AppData\Local\Temp\claude\REDACTED\19dcb0f0-854e-4e9d-8803-ce736db0162d\tasks\bl77b1v4s.output</output-file>
+<status>failed</status>
+<summary>Background command "Install CPU requirements into patchsloth env" failed with exit code 1</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b2g3yl9zv</task-id>
+<tool-use-id>toolu_018UKPxiPgNTsPVQVUGFvL1g</tool-use-id>
+<output-file>C:\Users\maukh\AppData\Local\Temp\claude\REDACTED\19dcb0f0-854e-4e9d-8803-ce736db0162d\tasks\b2g3yl9zv.output</output-file>
+<status>completed</status>
+<summary>Background command "Install CPU requirements using absolute path" completed (exit code 0)</summary>
+</task-notification>
