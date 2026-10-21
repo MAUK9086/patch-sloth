@@ -54,10 +54,11 @@ class FeatureBuilder:
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         d = df[INPUT_COLUMNS + ([LLM_INPUT] if self.with_llm and LLM_INPUT in df else [])]
         X = pd.DataFrame(index=d.index)
-        cna = d.cna_vector.map(lambda v: parse(v) if isinstance(v, str) else None)
+        # parsed vectors as a plain list: Series.map would turn None into NaN, and NaN is truthy
+        cna = [parse(v) if isinstance(v, str) else None for v in d.cna_vector]
         for k in METRICS:
-            X[f"cna_{k}"] = cna.map(lambda m, k=k: VALUES[k].index(m[k]) if m else np.nan)
-        cna_score = cna.map(lambda m: base_score(m) if m else np.nan)
+            X[f"cna_{k}"] = [VALUES[k].index(m[k]) if isinstance(m, dict) else np.nan for m in cna]
+        cna_score = [base_score(m) if isinstance(m, dict) else np.nan for m in cna]
         X["cna_score"] = cna_score
         cna_id = d.cna.where(d.cna.isin(self.cna_vocab), "other")
         X["cna_id"] = cna_id.map(self.cna_vocab.index)
@@ -74,10 +75,10 @@ class FeatureBuilder:
         for i in range(emb.shape[1]):
             X[f"txt{i}"] = emb[:, i]
         if self.with_llm:
-            llm = d[LLM_INPUT].map(lambda v: parse(v) if isinstance(v, str) else None) \
-                if LLM_INPUT in d else pd.Series(None, index=d.index, dtype=object)
-            X["llm_score_delta"] = [base_score(m) - s if m and c else np.nan
-                                    for m, c, s in zip(llm, cna, cna_score)]
+            llm = [parse(v) if isinstance(v, str) else None for v in d[LLM_INPUT]] \
+                if LLM_INPUT in d else [None] * len(d)
+            both = [isinstance(m, dict) and isinstance(c, dict) for m, c in zip(llm, cna)]
+            X["llm_score_delta"] = [base_score(m) - s if ok else np.nan for m, s, ok in zip(llm, cna_score, both)]
             for k in METRICS:
-                X[f"llm_changed_{k}"] = [float(m[k] != c[k]) if m and c else np.nan for m, c in zip(llm, cna)]
+                X[f"llm_changed_{k}"] = [float(m[k] != c[k]) if ok else np.nan for m, c, ok in zip(llm, cna, both)]
         return X[self.feature_names]

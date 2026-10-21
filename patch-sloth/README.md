@@ -11,15 +11,33 @@ Patch Sloth reads your lockfile and finds the vulnerabilities NIST never checked
 - **Ultramarine 1 Flash:** writes the report.
 
 ## Reproduce
+CPU-only, works on Windows, macOS and Linux. Run everything from this folder.
 ```
-pip install -r requirements.txt
-bash scripts/01_download.sh
+conda create -n patchsloth python=3.11 && conda activate patchsloth
+pip install -r requirements.txt && pip install -e .     # GPU box: also requirements-gpu.txt
+python scripts/01_download.py        # or: bash scripts/01_download.sh
 python scripts/02_build_dataset.py
 python scripts/03_baselines.py
 python scripts/07_tabpfn_bump.py --model hgb      # or --model tabpfn (GPU)
-python scripts/04_make_tinker_data.py && python scripts/05_tinker_train.py --dry_run
+patchsloth feed build                # HGB-only second-opinion feed -> feed/
+pytest -q
 ```
-See `PLAN.md` for the full build plan and the current results.
+The M1 numbers are in `results/m1_reproduction.md`. Decisions and their reasons are in `DECISIONS.md`.
+
+## Use
+```
+patchsloth scan path/to/package-lock.json --no-llm   # or requirements.txt, or a project directory
+patchsloth cve CVE-2025-5889
+patchsloth serve                                     # web page + API on http://127.0.0.1:8080
+patchsloth costs
+```
+`--no-llm` makes no paid calls: the bump probability comes from HistGBT and the report from a template. When
+`PAPERINSTRUMENTS_API_KEY` is set in `.env`, Ultramarine 1 Flash writes the report. A guardrail checks every CVE
+ID and number in its report against the input, and falls back to the template if the check fails.
+If [osv-scanner](https://github.com/google/osv-scanner) is installed and `OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY` points
+to its offline DB, it is used for matching; otherwise a built-in matcher runs over the GitHub Advisory Database.
+
+See `PLAN.md` for the full build plan.
 
 ## Data and licences
 - **NVD**, via the [fkie-cad mirror](https://github.com/fkie-cad/nvd-json-data-feeds): public domain.

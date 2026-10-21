@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patch Sloth</title>
+<style>
+  :root { --bg:#fbfaf7; --fg:#1d1b18; --muted:#6b665e; --card:#fff; --line:#e4e0d8; --accent:#2f6f4f;
+          --p0:#b3261e; --p1:#a15c00; --p2:#5f6368; --warn-bg:#fff6e0; --warn-line:#e8c66b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151412; --fg:#ece8e1; --muted:#a39d93; --card:#1e1c19; --line:#34302a; --accent:#6fbf93;
+            --p0:#ff8a80; --p1:#ffb74d; --p2:#9aa0a6; --warn-bg:#2b2416; --warn-line:#6b5a2a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 1.8rem; }
+  .tag { color: var(--muted); margin: 0 0 16px; }
+  .banner { background:var(--warn-bg); border:1px solid var(--warn-line); border-radius:8px; padding:10px 12px; font-size:.92rem; margin-bottom:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  textarea { width:100%; min-height:180px; font:13px/1.4 ui-monospace, Consolas, monospace; padding:10px;
+             border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--fg); resize:vertical; }
+  #drop.over textarea { border-color: var(--accent); outline: 2px dashed var(--accent); }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:10px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:1rem; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  label.small { color:var(--muted); font-size:.9rem; }
+  #status { color:var(--muted); font-size:.9rem; }
+  #report { margin-top:20px; overflow-wrap:anywhere; }
+  #report table { border-collapse:collapse; width:100%; font-size:.9rem; display:block; overflow-x:auto; }
+  #report th, #report td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  #report code { font-size:.9em; }
+  .counts { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+  .pill { border-radius:999px; padding:4px 12px; font-weight:600; border:1px solid var(--line); }
+  .P0 { color:var(--p0); } .P1 { color:var(--p1); } .P2 { color:var(--p2); }
+  footer { color:var(--muted); font-size:.85rem; margin-top:24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Patch Sloth</h1>
+  <p class="tag">The second opinion NIST stopped giving, for the CVEs in your own lockfile.</p>
+  <div class="banner"><strong>Estimates, not official scores.</strong> "Likely under-rated" means an independent
+    NVD-style reviewer would likely rate it higher, not that the vendor is wrong.
+    Data as of <span id="asof">…</span>.</div>
+
+  <div class="card" id="drop">
+    <textarea id="text" placeholder="Paste package-lock.json or requirements.txt here, or drop the file on this box"></textarea>
+    <div class="row">
+      <input type="file" id="file" accept=".json,.txt">
+      <label class="small"><input type="checkbox" id="nollm"> no LLM (template report)</label>
+      <button id="go">Scan</button>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <div class="counts" id="counts"></div>
+  <div id="report"></div>
+  <footer>Data: NVD (fkie-cad mirror), CISA KEV, GitHub Advisory Database (CC-BY 4.0), EPSS (FIRST).
+    Open feed: <a href="/feed/latest.csv">feed/latest.csv</a>.</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// Minimal Markdown: headings, tables, lists, bold/italic/code, links (http only), <details>/<summary> only.
+function inline(s) {
+  return esc(s)
+    .replace(/&lt;(\/?)(details|summary)&gt;/g, '<$1$2>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^\w])_([^_]+)_(?=[^\w]|$)/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+}
+function md(src) {
+  const lines = src.replace(/\r/g, '').split('\n'); let out = [], i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\s*\|/.test(l) && i + 1 < lines.length && /^\s*\|?\s*-{3}/.test(lines[i + 1])) {
+      const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => inline(c.trim()));
+      let h = '<table><thead><tr>' + cells(l).map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+      i += 2;
+      while (i < lines.length && /^\s*\|/.test(lines[i])) { h += '<tr>' + cells(lines[i]).map(c => `<td>${c}</td>`).join('') + '</tr>'; i++; }
+      out.push(h + '</tbody></table>'); continue;
+    }
+    if (/^\s*[-*] /.test(l)) {
+      let h = '<ul>';
+      while (i < lines.length && /^\s*[-*] /.test(lines[i])) { h += `<li>${inline(lines[i].replace(/^\s*[-*] /, ''))}</li>`; i++; }
+      out.push(h + '</ul>'); continue;
+    }
+    const m = l.match(/^(#{1,4}) (.*)/);
+    if (m) out.push(`<h${m[1].length + 1}>${inline(m[2])}</h${m[1].length + 1}>`);
+    else if (/^---+$/.test(l.trim())) out.push('<hr>');
+    else if (l.trim()) out.push(/^\s*<\/?(details|summary)/.test(l) ? inline(l) : `<p>${inline(l)}</p>`);
+    i++;
+  }
+  return out.join('\n');
+}
+
+fetch('/health').then(r => r.json()).then(h => $('asof').textContent = h.data_as_of || 'unknown').catch(() => {});
+
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f) { $('file').files = ev.dataTransfer.files; $('text').value = ''; $('status').textContent = f.name; } });
+
+$('go').addEventListener('click', async () => {
+  const fd = new FormData(), f = $('file').files[0];
+  if (f) { if (f.size > 2 * 1024 * 1024) { $('status').textContent = 'File is larger than 2 MB.'; return; } fd.append('file', f); }
+  else if ($('text').value.trim()) fd.append('text', $('text').value);
+  else { $('status').textContent = 'Paste a lockfile or choose a file first.'; return; }
+  fd.append('no_llm', $('nollm').checked ? 'true' : 'false');
+  $('go').disabled = true; $('status').textContent = 'Scanning…'; $('report').innerHTML = ''; $('counts').innerHTML = '';
+  try {
+    const r = await fetch('/scan', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    $('counts').innerHTML = ['P0', 'P1', 'P2'].map(b => `<span class="pill ${b}">${b}: ${j.counts[b]}</span>`).join('');
+    $('report').innerHTML = md(j.report_md || '');
+    $('status').textContent = `${j.n_deps} dependencies, ${j.rows.length} CVEs · report by ${j.costs.writer}` +
+      (j.costs.usd ? ` · $${j.costs.usd.toFixed(4)}` : '');
+  } catch (e) { $('status').textContent = 'Error: ' + e.message; }
+  finally { $('go').disabled = false; }
+});
+</script>
+</body>
+</html>

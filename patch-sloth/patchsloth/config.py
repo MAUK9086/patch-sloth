@@ -25,7 +25,7 @@ CISA_ADP = "134c704f-9b21-4f2e-91b3-4a467353bcc0"
 VAL_START = "2025-07-01"
 TEST_START = "2026-01-01"
 LABELED_STATUSES = ("Analyzed", "Modified")
-UNANALYSED_STATUSES = ("Deferred", "Awaiting Analysis", "Received")
+UNANALYSED_STATUSES = ("Deferred", "Awaiting Analysis", "Received", "Undergoing Analysis")
 
 # Task B thresholds (SPEC §9.2, §11.3). Tuned on val by scripts/07 and written to results/thresholds.json.
 THRESHOLDS_FILE = RESULTS / "thresholds.json"

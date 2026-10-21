@@ -1,0 +1,17 @@
+{
+ "data_as_of": "2026-10-21T14:41Z",
+ "epss_date": "2026-10-21",
+ "model": "hgb",
+ "llm_backend": "null",
+ "thresholds": {
+  "tau": 0.07172519219311888,
+  "tau_high": 0.44152513640273766,
+  "model": "hgb",
+  "tuned_on": "val published >= 2025-09-30",
+  "n_tune": 5614,
+  "base_rate_tune": 0.19077306733167082
+ },
+ "n_rows": 239058,
+ "n_model": 57603,
+ "n_csv": 57603
+}
