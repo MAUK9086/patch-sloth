@@ -1,0 +1,59 @@
+{
+ "base": "Qwen/Qwen3-8B",
+ "renderer": "qwen3_disable_thinking",
+ "rank": 32,
+ "lr": 0.0002,
+ "batch": 64,
+ "epochs": 1,
+ "n_train": 128,
+ "dry_run": true,
+ "estimate": {
+  "train_tokens": 33065,
+  "prefill_tokens": 73301,
+  "n_samples": 320,
+  "sample_tokens_max": 25600,
+  "usd_train": 0.0145486,
+  "usd_prefill": 0.014293695,
+  "usd_sample_max": 0.01536,
+  "usd_total_max": 0.044202295
+ },
+ "ft_path": "tinker://667ad0b6-08bd-5aa8-9290-2d970e8c3ec1:train:0/sampler_weights/patchsloth-taskA_dryrun",
+ "sampling": {
+  "ft_val": {
+   "n": 64,
+   "prefill": 15164,
+   "cached": 1920,
+   "gen": 2176
+  },
+  "ft_test": {
+   "n": 64,
+   "prefill": 14118,
+   "cached": 2176,
+   "gen": 2176
+  },
+  "base_val": {
+   "n": 64,
+   "prefill": 15164,
+   "cached": 1920,
+   "gen": 4012
+  },
+  "base_test": {
+   "n": 64,
+   "prefill": 14118,
+   "cached": 2176,
+   "gen": 4024
+  },
+  "ft_stack_train": {
+   "n": 64,
+   "prefill": 14737,
+   "cached": 4736,
+   "gen": 2176
+  }
+ },
+ "spent_usd": {
+  "train": 0.0,
+  "prefill": 0.012276927000000002,
+  "sample": 0.0087384,
+  "total": 0.021015327
+ }
+}

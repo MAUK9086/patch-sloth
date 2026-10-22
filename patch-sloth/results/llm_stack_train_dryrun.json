@@ -1,0 +1,34 @@
+{
+ "ft": {
+  "acc_AV": 0.9375,
+  "acc_AC": 0.921875,
+  "acc_PR": 0.796875,
+  "acc_UI": 0.921875,
+  "acc_S": 0.890625,
+  "acc_C": 0.765625,
+  "acc_I": 0.796875,
+  "acc_A": 0.90625,
+  "exact_vector": 0.5,
+  "score_mae": 0.9578125,
+  "severity_acc": 0.6875,
+  "bump_precision": 0.6,
+  "bump_recall": 0.2727272727272727,
+  "bump_f1": 0.375,
+  "bump_base_rate": 0.171875,
+  "severity_acc_ci95": [
+   0.562109375,
+   0.796875
+  ],
+  "bump_f1_ci95": [
+   0.0,
+   0.6371212121212123
+  ],
+  "json_valid": 1.0,
+  "n": 64,
+  "mcnemar_vs_copy_cna_severity": {
+   "a_only": 2,
+   "b_only": 4,
+   "p_value": 0.6830913983096086
+  }
+ }
+}

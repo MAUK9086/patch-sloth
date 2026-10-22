@@ -1,0 +1,2 @@
+{"step": 1, "epoch": 0, "lr": 0.0002, "tokens": 17218, "metrics": {"loss:sum": 41.516297340393066, "clock_cycle:unique": 4896764.0}, "usd_train": 0.00757592, "elapsed_s": 37.5}
+{"step": 2, "epoch": 0, "lr": 0.0001, "tokens": 15847, "metrics": {"loss:sum": 19.653122425079346, "clock_cycle:unique": 4896766.0}, "usd_train": 0.0145486, "elapsed_s": 40.6}

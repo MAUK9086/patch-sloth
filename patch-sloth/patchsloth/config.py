@@ -42,6 +42,12 @@ EPSS_P0 = 0.10
 
 # LLM (SPEC §9.1, §11.4, §11.7)
 BASE_MODEL = "Qwen/Qwen3-8B"
+# tinker_cookbook renderer for Qwen3 with thinking disabled (VERIFIED 2026-10-23 against get_renderer docs);
+# serving must render the same way (chat template with enable_thinking=False)
+TINKER_RENDERER = "qwen3_disable_thinking"
+# USD per 1M tokens for Qwen/Qwen3-8B (tinker-docs models_and_pricing, VERIFIED 2026-10-23)
+TINKER_PRICE = {"train": 0.44, "prefill": 0.195, "prefill_cached": 0.039, "sample": 0.60}
+TINKER_BUDGET_USD = 9.0  # abort above this (promo credit is $10)
 LLM_BACKEND = os.environ.get("PATCHSLOTH_LLM_BACKEND", "null")
 VLLM_BASE_URL = os.environ.get("VLLM_BASE_URL", "")
 VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "")

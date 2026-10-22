@@ -1,74 +1,183 @@
-"""Task A: LoRA SFT of Qwen3-8B on Tinker, then greedy eval on val/test.
-Needs: pip install tinker tinker-cookbook ; export TINKER_API_KEY=...
-NOTE: written against the Tinker low-level API (ServiceClient / forward_backward / optim_step /
-sampling client). Check names against the current docs before the first run - run with --dry_run first.
-Usage: python scripts/05_tinker_train.py --epochs 1 --eval_n 8000
+"""Task A: LoRA SFT of Qwen3-8B on Tinker, then greedy predictions for val/test (ft + base zero-shot)
+and stack_train (ft only, out-of-SFT rows for stacking, SPEC §9.2).
+API names VERIFIED 2026-10-23 against tinker 0.34.0 / tinker-cookbook 0.5.7 and tinker-docs (see DECISIONS.md).
+
+Every token is counted locally before any paid call; the run aborts if the estimate exceeds --budget.
+Usage:
+  python scripts/05_tinker_train.py --dry_run          # 128 train examples, 64 eval rows per split
+  python scripts/05_tinker_train.py --estimate_only    # exact token counts + projected cost, no API calls
+  python scripts/05_tinker_train.py                    # full run: 1 epoch, eval_n=8000, n_stack=10000
+  python scripts/05_tinker_train.py --model_path tinker://.../sampler_weights/... --skip_train   # eval only
 """
 import argparse
 import json
 import random
+import sys
+import time
+from concurrent.futures import Future
+from pathlib import Path
 
-import tinker
-from tinker import types
-from tinker_cookbook import renderers
-from tinker_cookbook.tokenizer_utils import get_tokenizer
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from patchsloth import config, costs  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--base", default="Qwen/Qwen3-8B")
+ap.add_argument("--base", default=config.BASE_MODEL)
+ap.add_argument("--renderer", default=config.TINKER_RENDERER)
 ap.add_argument("--rank", type=int, default=32)
 ap.add_argument("--lr", type=float, default=2e-4)
 ap.add_argument("--batch", type=int, default=64)
 ap.add_argument("--epochs", type=int, default=1)
-ap.add_argument("--eval_n", type=int, default=8000, help="examples per eval split (cost control)")
+ap.add_argument("--eval_n", type=int, default=8000, help="rows per eval split (val/test are pre-shuffled by 04)")
+ap.add_argument("--n_stack", type=int, default=10000, help="stack_train rows to predict with the fine-tuned model")
+ap.add_argument("--max_tokens", type=int, default=48, help="fine-tuned model (compact JSON is ~34 tokens)")
+ap.add_argument("--base_max_tokens", type=int, default=128,
+                help="base zero-shot answers in fenced, pretty-printed JSON (~70 tokens); 48 would truncate it")
+ap.add_argument("--concurrency", type=int, default=64, help="sample requests in flight")
+ap.add_argument("--budget", type=float, default=config.TINKER_BUDGET_USD)
 ap.add_argument("--dry_run", action="store_true")
+ap.add_argument("--estimate_only", action="store_true")
+ap.add_argument("--skip_train", action="store_true")
+ap.add_argument("--model_path", default=None, help="tinker://... sampler weights to evaluate (with --skip_train)")
 a = ap.parse_args()
 
+import tinker  # noqa: E402
+from tinker import types  # noqa: E402
+from tinker_cookbook import renderers  # noqa: E402
+from tinker_cookbook.renderers import TrainOnWhat  # noqa: E402
+from tinker_cookbook.supervised.data import conversation_to_datum  # noqa: E402
+from tinker_cookbook.tokenizer_utils import get_tokenizer  # noqa: E402
+
+P = config.TINKER_PRICE
+TAG = "_dryrun" if a.dry_run else ""
+n_train_rows = 128 if a.dry_run else None
+n_eval = 64 if a.dry_run else a.eval_n
+n_stack = 64 if a.dry_run else a.n_stack
+
 tok = get_tokenizer(a.base)
-renderer = renderers.get_renderer("qwen3", tok)  # chat template matching the base model
+renderer = renderers.get_renderer(a.renderer, tok)
+
+
+def load(split, n=None):
+    rows = [json.loads(line) for line in open(f"data/tinker/{split}.jsonl", encoding="utf-8")]
+    return rows[:n] if n else rows
+
 
 def to_datum(msgs):
-    tokens, weights = renderer.build_supervised_example(msgs)  # weights=1 only on assistant tokens
-    tokens, weights = list(tokens), list(weights)
-    return types.Datum(model_input=types.ModelInput.from_ints(tokens[:-1]),
-                       loss_fn_inputs=dict(weights=weights[1:], target_tokens=tokens[1:]))
+    # loss only on the assistant JSON; per-example mean reduction (cookbook SFT default)
+    return conversation_to_datum(msgs, renderer, max_length=None, train_on_what=TrainOnWhat.LAST_ASSISTANT_MESSAGE)
 
-train = [json.loads(l) for l in open("data/tinker/train.jsonl")]
-if a.dry_run:
-    train = train[:128]
+
+def prompt_of(x):
+    return renderer.build_generation_prompt(x["messages"][:-1])
+
+
+# ---------------------------------------------------------------- exact token accounting
+train = load("train", n_train_rows)
+data = [to_datum(x["messages"]) for x in train]
+train_tokens = sum(d.model_input.length for d in data) * a.epochs
+eval_sets = [("val", "ft", n_eval), ("test", "ft", n_eval), ("val", "base", n_eval), ("test", "base", n_eval),
+             ("stack_train", "ft", n_stack)]
+prompts = {s: [prompt_of(x) for x in load(s, n)] for s, _, n in eval_sets}
+prefill_tokens = sum(sum(p.length for p in prompts[s]) for s, _, _ in eval_sets)
+n_samples = sum(len(prompts[s]) for s, _, _ in eval_sets)
+max_tok = {"ft": a.max_tokens, "base": a.base_max_tokens}
+est = dict(train_tokens=train_tokens, prefill_tokens=prefill_tokens, n_samples=n_samples,
+           sample_tokens_max=sum(len(prompts[s]) * max_tok[t] for s, t, _ in eval_sets))
+est["usd_train"] = train_tokens * P["train"] / 1e6
+est["usd_prefill"] = prefill_tokens * P["prefill"] / 1e6  # upper bound: ignores cached-prefill discount
+est["usd_sample_max"] = est["sample_tokens_max"] * P["sample"] / 1e6
+est["usd_total_max"] = est["usd_train"] + est["usd_prefill"] + est["usd_sample_max"]
+print("ESTIMATE", json.dumps({k: round(v, 4) if isinstance(v, float) else v for k, v in est.items()}))
+if a.estimate_only:
+    sys.exit(0)
+if est["usd_total_max"] > a.budget:
+    sys.exit(f"ABORT: estimated ${est['usd_total_max']:.2f} > budget ${a.budget:.2f}")
+
 svc = tinker.ServiceClient()
-tc = svc.create_lora_training_client(base_model=a.base, rank=a.rank)
-log = open("results/tinker_train_log.jsonl", "a")
-step = 0
-for ep in range(a.epochs):
-    random.Random(ep).shuffle(train)
-    for i in range(0, len(train), a.batch):
-        batch = [to_datum(x["messages"]) for x in train[i:i + a.batch]]
-        fb = tc.forward_backward(batch, "cross_entropy")
-        opt = tc.optim_step(types.AdamParams(learning_rate=a.lr * (1 - i / len(train))))
-        r = fb.result(); opt.result()
-        step += 1
-        if step % 10 == 0:
-            loss = sum(float(x) for x in r.metrics.values()) if hasattr(r, "metrics") else None
-            log.write(json.dumps({"step": step, "epoch": ep, "metrics": getattr(r, "metrics", {})}, default=str) + "\n"); log.flush()
-            print("step", step, getattr(r, "metrics", ""))
+spent = {"train": 0.0, "prefill": 0.0, "sample": 0.0}
+run = dict(base=a.base, renderer=a.renderer, rank=a.rank, lr=a.lr, batch=a.batch, epochs=a.epochs,
+           n_train=len(train), dry_run=a.dry_run, estimate=est)
 
-sampler = tc.save_weights_and_get_sampling_client(name="patch-sloth-taskA")
-params = types.SamplingParams(max_tokens=48, temperature=0.0, stop=renderer.get_stop_sequences())
+# ---------------------------------------------------------------- training
+if a.skip_train:
+    if not a.model_path:
+        sys.exit("--skip_train needs --model_path")
+    ft_path = a.model_path
+else:
+    tc = svc.create_lora_training_client(base_model=a.base, rank=a.rank, seed=0)
+    log = open(f"results/tinker_train_log{TAG}.jsonl", "a", encoding="utf-8")
+    steps_per_epoch = (len(data) + a.batch - 1) // a.batch
+    total, step, t0 = steps_per_epoch * a.epochs, 0, time.time()
+    for ep in range(a.epochs):
+        order = list(range(len(data)))
+        random.Random(ep).shuffle(order)
+        for i in range(0, len(order), a.batch):
+            batch = [data[j] for j in order[i:i + a.batch]]
+            lr = a.lr * (1 - step / total)  # linear decay to 0 over the whole run
+            fb = tc.forward_backward(batch, "cross_entropy")
+            opt = tc.optim_step(types.AdamParams(learning_rate=lr))
+            r = fb.result()
+            opt.result()
+            step += 1
+            ntok = sum(d.model_input.length for d in batch)
+            spent["train"] += ntok * P["train"] / 1e6
+            if step % 10 == 0 or a.dry_run or step == total:
+                rec = dict(step=step, epoch=ep, lr=lr, tokens=ntok, metrics=r.metrics, usd_train=spent["train"],
+                           elapsed_s=round(time.time() - t0, 1))
+                log.write(json.dumps(rec, default=float) + "\n")
+                log.flush()
+                print("step", step, "/", total, r.metrics, f"${spent['train']:.3f}")
+    costs.log("tinker", a.base, int(train_tokens), 0, time.time() - t0, spent["train"], task=f"sft{TAG}",
+              train_tokens=int(train_tokens), steps=step)
+    ft_path = tc.save_weights_for_sampler(name=f"patchsloth-taskA{TAG or '-final'}").result().path
+    print("saved sampler weights:", ft_path)
+run["ft_path"] = ft_path
+Path(f"results/tinker_run{TAG}.json").write_text(json.dumps(run, indent=1, default=float))
 
-def predict(split, client, tag):
-    rows = [json.loads(l) for l in open(f"data/tinker/{split}.jsonl")]
-    rows = rows[: (64 if a.dry_run else a.eval_n)]
-    futures = []
-    for x in rows:
-        prompt = renderer.build_generation_prompt(x["messages"][:-1])
-        futures.append((x["cve"], client.sample(prompt=prompt, num_samples=1, sampling_params=params)))
-    with open(f"results/llm_preds_{tag}_{split}.jsonl", "w") as f:
-        for cve, fut in futures:
-            seq = fut.result().sequences[0].tokens
-            f.write(json.dumps({"cve": cve, "text": tok.decode(seq)}) + "\n")
+# ---------------------------------------------------------------- sampling
+params = {t: types.SamplingParams(max_tokens=m, temperature=0.0, stop=renderer.get_stop_sequences())
+          for t, m in max_tok.items()}
+clients = {"ft": svc.create_sampling_client(model_path=ft_path),
+           "base": svc.create_sampling_client(base_model=a.base)}  # zero-shot baseline, same prompt + renderer
 
-base_sampler = svc.create_sampling_client(base_model=a.base)  # zero-shot baseline, same prompt
-for split in ["val", "test"]:
-    predict(split, sampler, "ft")
-    predict(split, base_sampler, "base")
-print("saved preds -> results/llm_preds_*.jsonl ; now run scripts/06_eval_llm.py")
+
+def predict(split, tag, n):
+    rows = load(split, n)
+    t0, out = time.time(), [None] * len(rows)
+    pre = cached = gen = 0
+    inflight: list[tuple[int, Future]] = []
+
+    def drain(k):
+        nonlocal pre, cached, gen
+        while len(inflight) > k:
+            i, fut = inflight.pop(0)
+            res = fut.result()
+            seq = res.sequences[0]
+            out[i] = seq.tokens
+            pre += prompts[split][i].length
+            cached += getattr(res, "prompt_cache_hit_tokens", 0) or 0
+            gen += len(seq.tokens)
+
+    for i in range(len(rows)):
+        inflight.append((i, clients[tag].sample(prompt=prompts[split][i], num_samples=1, sampling_params=params[tag])))
+        drain(a.concurrency)
+    drain(0)
+    with open(f"results/llm_preds_{tag}_{split}{TAG}.jsonl", "w", encoding="utf-8") as f:
+        for x, toks in zip(rows, out):
+            f.write(json.dumps({"cve": x["cve"], "text": tok.decode(toks)}) + "\n")
+    usd_pre = ((pre - cached) * P["prefill"] + cached * P["prefill_cached"]) / 1e6
+    usd_gen = gen * P["sample"] / 1e6
+    spent["prefill"] += usd_pre
+    spent["sample"] += usd_gen
+    costs.log("tinker", a.base, pre, gen, time.time() - t0, usd_pre + usd_gen, task=f"sample_{tag}_{split}{TAG}",
+              cached_input_tokens=cached, n=len(rows))
+    print(f"{tag} {split}: n={len(rows)} prefill={pre} (cached {cached}) gen={gen} "
+          f"mean_gen={gen / max(len(rows), 1):.1f} ${usd_pre + usd_gen:.4f}")
+    return dict(n=len(rows), prefill=pre, cached=cached, gen=gen)
+
+
+run["sampling"] = {f"{tag}_{s}": predict(s, tag, n) for s, tag, n in eval_sets}
+run["spent_usd"] = {**spent, "total": sum(spent.values())}
+Path(f"results/tinker_run{TAG}.json").write_text(json.dumps(run, indent=1, default=float))
+print("SPENT", json.dumps({k: round(v, 4) for k, v in run["spent_usd"].items()}))
+print("saved preds -> results/llm_preds_*; now run scripts/06_eval_llm.py" + (" --dry_run" if a.dry_run else ""))

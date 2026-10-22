@@ -24,6 +24,9 @@ SYSTEM = f"""You write a short security triage report for a software maintainer,
 You receive JSON with dependency CVEs that are ALREADY prioritised into P0 (patch now), P1 (this month)
 and P2 (ignore for now). Never change a priority. Never invent CVE IDs, scores, versions, dates or
 probabilities: only use values present in the JSON or returned by tools, written exactly as given.
+Fields: cna_* is the reporter's (CNA's) own score. nvd_* is NVD's official analysis (only when NVD analysed it).
+predicted_* is a model estimate. p_bump is the estimated probability that an independent NVD-style reviewer
+would raise the CNA's severity band. counts.packages is the number of affected packages.
 Structure:
 1. A 3-line summary.
 2. A "P0: Patch now" table, then "P1: This month" (columns: CVE, package, installed, fix, why).
@@ -95,14 +98,22 @@ def build_payload(rows: list[dict], data_as_of: str | None = None, epss_date: st
     """Display-ready facts (rounded exactly as they may appear in the report)."""
     out = []
     for r in rows:
+        # for CVEs NVD analysed, the "predicted" vector is NVD's official one: name it so the writer can't
+        # present it as a model prediction
+        nvd = r.get("source") == "nvd"
+        pv = r.get("predicted_vector")
         out.append(dict(
             cve=r["cve"], package=r.get("package"), version=r.get("version"), fixed=r.get("fixed"),
             bucket=r["bucket"], reason=list(r.get("reason", [])), source=r.get("source"),
             cna_vector=r.get("cna_vector"), cna_score=_score(r.get("cna_vector")),
-            cna_severity=_sev(r.get("cna_vector")), predicted_vector=r.get("predicted_vector"),
-            predicted_score=_score(r.get("predicted_vector")), predicted_severity=_sev(r.get("predicted_vector")),
+            cna_severity=_sev(r.get("cna_vector")),
+            nvd_vector=pv if nvd else None, nvd_score=_score(pv) if nvd else None,
+            nvd_severity=_sev(pv) if nvd else None,
+            predicted_vector=None if nvd else pv, predicted_score=None if nvd else _score(pv),
+            predicted_severity=None if nvd else _sev(pv),
             p_bump=_r(r.get("p_bump"), 2), epss=_r(r.get("epss"), 3), kev_date=r.get("kev_date")))
     counts = {b: sum(r["bucket"] == b for r in out) for b in ("P0", "P1", "P2")}
+    counts["packages"] = len({(r["package"], r["version"]) for r in out})
     counts["likely_underrated"] = sum(any("under-rated" in x for x in r["reason"]) for r in out)
     return dict(counts=counts, n_cves=len(out), data_as_of=data_as_of, epss_date=epss_date, rows=out)
 
@@ -111,7 +122,7 @@ def _opinion(r: dict) -> str:
     """What the second-opinion cell can honestly say for this row."""
     p = f"p(higher)={r['p_bump']}" if r["p_bump"] is not None else ""
     if r["source"] == "nvd":
-        return f"NVD: {r['predicted_severity']}"
+        return f"NVD: {r['nvd_severity']}"
     if r["source"] in ("model", "model-on-demand"):
         if r["predicted_vector"] and r["predicted_vector"] != r["cna_vector"]:  # an LLM vector exists
             return f"{r['predicted_severity']} ({p})" if p else r["predicted_severity"]
@@ -122,7 +133,7 @@ def _opinion(r: dict) -> str:
 def template_report(payload: dict) -> str:
     c = payload["counts"]
     rows_by = {b: [r for r in payload["rows"] if r["bucket"] == b] for b in ("P0", "P1", "P2")}
-    summary = [f"- {payload['n_cves']} CVEs in your dependencies: {c['P0']} patch now, {c['P1']} this month, "
+    summary = [f"- {payload['n_cves']} CVEs in {c['packages']} packages: {c['P0']} patch now, {c['P1']} this month, "
                f"{c['P2']} can wait.",
                f"- {c['likely_underrated']} look under-rated by their CNA "
                "(an independent reviewer would likely rate them higher).",
@@ -157,8 +168,8 @@ class ToolContext:
         if name == "get_cve":
             rec = self.feed.get(cve) if self.feed is not None else None
             r = self.rows[cve]
-            return dict(cve=cve, description=(rec or {}).get("description", "")[:600],
-                        cna_vector=r["cna_vector"], predicted_vector=r["predicted_vector"])
+            return dict(cve=cve, description=(rec or {}).get("description", "")[:600], cna_vector=r["cna_vector"],
+                        nvd_vector=r["nvd_vector"], predicted_vector=r["predicted_vector"])
         if name == "explain_flag":
             model = self.feed.model() if self.feed is not None else None
             rec = self.feed.get(cve) if self.feed is not None else None
