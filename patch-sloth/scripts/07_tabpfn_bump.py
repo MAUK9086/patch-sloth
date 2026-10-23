@@ -5,6 +5,7 @@ Usage: python scripts/07_tabpfn_bump.py --model tabpfn --n_train 10000 [--with_l
 With --model hgb it also saves data/models/bump_hgb.joblib (serve-time fallback) and results/thresholds.json."""
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -43,6 +44,8 @@ if a.with_llm:  # train only on rows that have an out-of-SFT LLM prediction
 idx = df[tr].sample(n=min(a.n_train, int(tr.sum())), random_state=0).index
 clf = tabular.fit(a.model, X.loc[idx], y.loc[idx])
 tag = a.model + ("_llm" if a.with_llm else "")
+if a.model == "tabpfn":  # one result file per context size (scaling curve, SPEC §9.2)
+    tag += f"_n{len(idx)}"
 
 
 def predict(mask):
@@ -64,6 +67,7 @@ p_def = predict(m_def)
 tau = float(np.quantile(p_def, 0.90))
 out = {}
 rng = np.random.default_rng(0)
+preds = {}
 for split in ["val", "test"]:
     m = (df.split == split).to_numpy()
     p = predict(m)
@@ -88,6 +92,8 @@ for split in ["val", "test"]:
                                  "floored at tau", model=tag, n_tune=int(recent.sum()),
                    base_rate_tune=float(yy[recent].mean()))
     out[split].update(at_tau=at(yy, p, tau), at_tau_high=at(yy, p, tau_high), at_tau_val=at(yy, p, tau_val))
+    preds[split] = pd.DataFrame({"cve": df.cve[m].to_numpy(), "published": df.published[m].to_numpy(),
+                                 "y": yy, "p": p})
     print(split, {k_: (np.round(v_, 3) if isinstance(v_, float) else v_) for k_, v_ in out[split].items()})
 out["thresholds"] = thr
 out["drift_finding"] = dict(
@@ -100,7 +106,12 @@ print("drift", out["drift_finding"])
 # score the real target population: Deferred CVEs nobody independently checked
 pd.DataFrame({"cve": df.cve[m_def], "cna": df.cna[m_def], "cna_vector": df.cna_vector[m_def], "p_bump": p_def}) \
   .sort_values("p_bump", ascending=False).to_csv(f"results/deferred_scored_{tag}.csv", index=False)
+out["model"] = dict(name=a.model, n_train=len(idx), n_features=X.shape[1],
+                    tabpfn_version=os.environ.get("PATCHSLOTH_TABPFN_VERSION", "v3.5") if a.model == "tabpfn" else None)
 json.dump(out, open(f"results/bump_{tag}.json", "w"), indent=1, default=float)
+# per-row val/test predictions for the calibration and scaling plots (scripts/11_tabpfn_plots.py)
+Path("data/preds").mkdir(parents=True, exist_ok=True)
+pd.concat([d.assign(split=k) for k, d in preds.items()]).to_parquet(f"data/preds/bump_{tag}.parquet", index=False)
 if a.model == "hgb" and not a.with_llm:  # the CPU serve-time fallback
     print("saved", tabular.BumpModel(fb, clf, "hgb").save())
     Path("results/thresholds.json").write_text(json.dumps(thr, indent=1))

@@ -1,84 +1,90 @@
 {
  "val": {
-  "n": 11655,
-  "base_rate": 0.22711282711282713,
-  "pr_auc": 0.8980702964340375,
+  "n": 11654,
+  "base_rate": 0.22713231508494938,
+  "pr_auc": 0.900104620514621,
   "pr_auc_ci95": [
-   0.8888345237903049,
-   0.9082100840436363
+   0.8903339488720896,
+   0.9090555761478066
   ],
-  "roc_auc": 0.9599625082452,
-  "brier": 0.06066010985968358,
-  "precision_at_top10pct": 0.9665236051502146,
+  "roc_auc": 0.9596850101350463,
+  "brier": 0.0609718977870133,
+  "precision_at_top10pct": 0.9759656652360515,
   "at_tau": {
-   "threshold": 0.7378191746679973,
-   "flag_rate": 0.18421278421278423,
-   "precision": 0.904052165812762,
-   "recall": 0.7332829618435965
+   "threshold": 0.7382137560988113,
+   "flag_rate": 0.1830272867684915,
+   "precision": 0.90014064697609,
+   "recall": 0.7253494522100491
   },
   "at_tau_high": {
-   "threshold": 0.7378191746679973,
-   "flag_rate": 0.18421278421278423,
-   "precision": 0.904052165812762,
-   "recall": 0.7332829618435965
+   "threshold": 0.7382137560988113,
+   "flag_rate": 0.1830272867684915,
+   "precision": 0.90014064697609,
+   "recall": 0.7253494522100491
   },
   "at_tau_val": {
-   "threshold": 0.07172519219311888,
-   "flag_rate": 0.383011583011583,
-   "precision": 0.5645161290322581,
+   "threshold": 0.07025297669154314,
+   "flag_rate": 0.3855328642526171,
+   "precision": 0.5608724682839973,
    "recall": 0.9520211560256895
   }
  },
  "test": {
-  "n": 30706,
-  "base_rate": 0.0928483032632059,
-  "pr_auc": 0.5797091726446628,
+  "n": 31198,
+  "base_rate": 0.09183280979549971,
+  "pr_auc": 0.5788597820552116,
   "pr_auc_ci95": [
-   0.5609159726952738,
-   0.5990312736148256
+   0.559642883383985,
+   0.5976007463857826
   ],
-  "roc_auc": 0.9025689481172889,
-  "brier": 0.05922594996054297,
-  "precision_at_top10pct": 0.5293159609120521,
+  "roc_auc": 0.9028194603336572,
+  "brier": 0.05860132876352674,
+  "precision_at_top10pct": 0.5338249438922732,
   "at_tau": {
-   "threshold": 0.7378191746679973,
-   "flag_rate": 0.04445385266723116,
-   "precision": 0.706959706959707,
-   "recall": 0.3384777271132936
+   "threshold": 0.7382137560988113,
+   "flag_rate": 0.04432976472850824,
+   "precision": 0.7180043383947939,
+   "recall": 0.34659685863874345
   },
   "at_tau_high": {
-   "threshold": 0.7378191746679973,
-   "flag_rate": 0.04445385266723116,
-   "precision": 0.706959706959707,
-   "recall": 0.3384777271132936
+   "threshold": 0.7382137560988113,
+   "flag_rate": 0.04432976472850824,
+   "precision": 0.7180043383947939,
+   "recall": 0.34659685863874345
   },
   "at_tau_val": {
-   "threshold": 0.07172519219311888,
-   "flag_rate": 0.27955448446557674,
-   "precision": 0.28681267474370925,
-   "recall": 0.8635566467905997
+   "threshold": 0.07025297669154314,
+   "flag_rate": 0.2795050964805436,
+   "precision": 0.2811926605504587,
+   "recall": 0.8558464223385689
   }
  },
  "thresholds": {
-  "tau": 0.7378191746679973,
-  "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=48979); no labels",
-  "tau_high": 0.7378191746679973,
+  "tau": 0.7382137560988113,
+  "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=49272); no labels",
+  "tau_high": 0.7382137560988113,
   "tau_high_rule": "val published >= 2025-09-30: largest flag set with precision >= 0.75, floored at tau",
   "model": "hgb",
-  "n_tune": 5614,
-  "base_rate_tune": 0.19077306733167082
+  "n_tune": 5613,
+  "base_rate_tune": 0.190807055050775
  },
  "drift_finding": {
-  "tau_val": 0.07172519219311888,
+  "tau_val": 0.07025297669154314,
   "rule": "SPEC \u00a79.2 literal: precision >= 0.5 on the last 3 months of val",
-  "val_recent_base_rate": 0.19077306733167082,
-  "test_base_rate": 0.0928483032632059,
+  "val_recent_base_rate": 0.190807055050775,
+  "test_base_rate": 0.09183280979549971,
   "test_at_tau_val": {
-   "threshold": 0.07172519219311888,
-   "flag_rate": 0.27955448446557674,
-   "precision": 0.28681267474370925,
-   "recall": 0.8635566467905997
+   "threshold": 0.07025297669154314,
+   "flag_rate": 0.2795050964805436,
+   "precision": 0.2811926605504587,
+   "recall": 0.8558464223385689
   },
   "note": "val-tuned threshold transfers badly to 2026: the bump base rate halved, so precision at tau_val drops"
+ },
+ "model": {
+  "name": "hgb",
+  "n_train": 10000,
+  "n_features": 49,
+  "tabpfn_version": null
  }
 }

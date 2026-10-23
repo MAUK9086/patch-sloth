@@ -1,0 +1,90 @@
+{
+ "val": {
+  "n": 11654,
+  "base_rate": 0.22713231508494938,
+  "pr_auc": 0.9159592784085768,
+  "pr_auc_ci95": [
+   0.9062644447136478,
+   0.9243040955809081
+  ],
+  "roc_auc": 0.9676171775727975,
+  "brier": 0.05761970207095146,
+  "precision_at_top10pct": 0.9819742489270387,
+  "at_tau": {
+   "threshold": 0.6911690831184387,
+   "flag_rate": 0.18534408786682685,
+   "precision": 0.9013888888888889,
+   "recall": 0.7355496788817529
+  },
+  "at_tau_high": {
+   "threshold": 0.6911690831184387,
+   "flag_rate": 0.18534408786682685,
+   "precision": 0.9013888888888889,
+   "recall": 0.7355496788817529
+  },
+  "at_tau_val": {
+   "threshold": 0.1231890320777893,
+   "flag_rate": 0.387249013214347,
+   "precision": 0.5672501661865721,
+   "recall": 0.9671326029467322
+  }
+ },
+ "test": {
+  "n": 31198,
+  "base_rate": 0.09183280979549971,
+  "pr_auc": 0.6226575263334391,
+  "pr_auc_ci95": [
+   0.6024319582084597,
+   0.6406752905548032
+  ],
+  "roc_auc": 0.9127617084993115,
+  "brier": 0.05631864070892334,
+  "precision_at_top10pct": 0.5658865020840013,
+  "at_tau": {
+   "threshold": 0.6911690831184387,
+   "flag_rate": 0.043079684595166354,
+   "precision": 0.7447916666666666,
+   "recall": 0.3493891797556719
+  },
+  "at_tau_high": {
+   "threshold": 0.6911690831184387,
+   "flag_rate": 0.043079684595166354,
+   "precision": 0.7447916666666666,
+   "recall": 0.3493891797556719
+  },
+  "at_tau_val": {
+   "threshold": 0.1231890320777893,
+   "flag_rate": 0.27729341624463105,
+   "precision": 0.28898393249335336,
+   "recall": 0.8726003490401396
+  }
+ },
+ "thresholds": {
+  "tau": 0.6911690831184387,
+  "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=49272); no labels",
+  "tau_high": 0.6911690831184387,
+  "tau_high_rule": "val published >= 2025-09-30: largest flag set with precision >= 0.75, floored at tau",
+  "model": "tabpfn_n10000",
+  "n_tune": 5613,
+  "base_rate_tune": 0.190807055050775
+ },
+ "drift_finding": {
+  "tau_val": 0.1231890320777893,
+  "rule": "SPEC \u00a79.2 literal: precision >= 0.5 on the last 3 months of val",
+  "val_recent_base_rate": 0.190807055050775,
+  "test_base_rate": 0.09183280979549971,
+  "test_at_tau_val": {
+   "threshold": 0.1231890320777893,
+   "flag_rate": 0.27729341624463105,
+   "precision": 0.28898393249335336,
+   "recall": 0.8726003490401396
+  },
+  "note": "val-tuned threshold transfers badly to 2026: the bump base rate halved, so precision at tau_val drops"
+ },
+ "model": {
+  "name": "tabpfn",
+  "n_train": 10000,
+  "n_features": 49,
+  "tabpfn_version": "v3.5"
+ }
+}

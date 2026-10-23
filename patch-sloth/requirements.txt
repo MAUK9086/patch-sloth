@@ -4,6 +4,7 @@ pyarrow
 scikit-learn
 scipy
 joblib
+matplotlib
 # LLM training/serving clients
 tinker
 tinker-cookbook

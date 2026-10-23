@@ -1,13 +1,13 @@
 {
- "tau_val": 0.07172519219311888,
+ "tau_val": 0.07025297669154314,
  "rule": "SPEC \u00a79.2 literal: precision >= 0.5 on the last 3 months of val",
- "val_recent_base_rate": 0.19077306733167082,
- "test_base_rate": 0.0928483032632059,
+ "val_recent_base_rate": 0.190807055050775,
+ "test_base_rate": 0.09183280979549971,
  "test_at_tau_val": {
-  "threshold": 0.07172519219311888,
-  "flag_rate": 0.27955448446557674,
-  "precision": 0.28681267474370925,
-  "recall": 0.8635566467905997
+  "threshold": 0.07025297669154314,
+  "flag_rate": 0.2795050964805436,
+  "precision": 0.2811926605504587,
+  "recall": 0.8558464223385689
  },
  "note": "val-tuned threshold transfers badly to 2026: the bump base rate halved, so precision at tau_val drops"
 }

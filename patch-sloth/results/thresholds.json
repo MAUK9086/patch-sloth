@@ -1,9 +1,9 @@
 {
- "tau": 0.7378191746679973,
- "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=48979); no labels",
- "tau_high": 0.7378191746679973,
+ "tau": 0.7382137560988113,
+ "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=49272); no labels",
+ "tau_high": 0.7382137560988113,
  "tau_high_rule": "val published >= 2025-09-30: largest flag set with precision >= 0.75, floored at tau",
  "model": "hgb",
- "n_tune": 5614,
- "base_rate_tune": 0.19077306733167082
+ "n_tune": 5613,
+ "base_rate_tune": 0.190807055050775
 }

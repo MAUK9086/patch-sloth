@@ -12,8 +12,13 @@ from .features import FeatureBuilder
 
 def make_model(name: str):
     if name == "tabpfn":
+        # pinned (the package default can change between releases); PATCHSLOTH_TABPFN_VERSION=v2.5 is the fallback
+        import os
+
         from tabpfn import TabPFNClassifier
-        return TabPFNClassifier(device="cuda")
+        from tabpfn.constants import ModelVersion
+        version = ModelVersion(os.environ.get("PATCHSLOTH_TABPFN_VERSION", "v3.5"))
+        return TabPFNClassifier.create_default_for_version(version, device="cuda", random_state=0)
     if name == "hgb":
         from sklearn.ensemble import HistGradientBoostingClassifier
         return HistGradientBoostingClassifier(max_iter=400, learning_rate=0.05, random_state=0)
