@@ -1,0 +1,17 @@
+# Build context = this folder (App Platform source_dir). Keep the image small and secret-free.
+.env
+data/
+feed/
+osv-db/
+adapter/
+adapter_raw/
+peft_adapter/
+results/
+!results/thresholds.json
+!results/data_as_of.txt
+scripts/
+post/
+.git
+**/__pycache__
+.pytest_cache/
+.ruff_cache/

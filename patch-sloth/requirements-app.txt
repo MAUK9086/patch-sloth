@@ -1,0 +1,19 @@
+# Serving image only (deploy/Dockerfile): the API, scanner, priority rules and report writer. No training/GPU deps.
+# Pinned to the versions the app and the feed's bump_hgb.joblib were tested with (2026-10-24); the HGB pickle
+# needs a matching scikit-learn.
+pandas==3.0.6
+pyarrow==26.0.0
+numpy==2.4.6
+scikit-learn==1.9.1
+scipy==1.17.1
+joblib==1.6.0
+openai==3.35.1
+packaging==26.3
+semver==3.1.0
+jinja2==3.1.6
+fastapi==0.157.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+httpx==0.28.1
+typer==0.27.3
+python-dotenv==1.2.4

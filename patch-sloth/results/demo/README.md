@@ -1,0 +1,17 @@
+# Demo scans of public repos
+
+`patchsloth scan <package-lock.json> -f json` on the current lockfile of three popular public npm projects, fetched read-only with the GitHub API on 2026-10-24. Feed: release `feed-2026-10-23` (served stacked/gated model). Scanner engine: `ghsa-fallback` (GitHub Advisory DB clone from 2026-10-21; osv-scanner's offline DB is not configured on this laptop). Report writer: Ultramarine 1 Flash with the guardrail (SPEC §11.4). The `.md` files are the writer's output verbatim; the `.json` files hold every row.
+
+**Caveats.** A package-lock includes dev, test and example dependencies, so a finding here does not mean the published package is affected. Scores are estimates for triage, not official scores. No issues were opened and nobody was contacted.
+
+| Repo | Stars | Commit | Deps | CVEs | Deferred CVEs | Bands (feed rows) | P0 / P1 / P2 | Report cost | Guardrail |
+|---|---|---|---|---|---|---|---|---|---|
+| [markedjs/marked](https://github.com/markedjs/marked/blob/4b7b5b2d1e05/package-lock.json) | 37,262 | `4b7b5b2d1e05` | 625 | 14 | 8 | likely 1, possible 1, unlikely 4 | 0 / 6 / 8 | $0.0012 | pass |
+| [mochajs/mocha](https://github.com/mochajs/mocha/blob/cb21a4eba550/package-lock.json) | 22,909 | `cb21a4eba550` | 715 | 36 | 11 | likely 1, possible 5, unlikely 6 | 1 / 21 / 14 | $0.0024 | pass |
+| [socketio/socket.io](https://github.com/socketio/socket.io/blob/1eaa582d3b45/package-lock.json) | 63,223 | `1eaa582d3b45` | 1,212 | 112 | 22 | likely 0, possible 5, unlikely 15 | 0 / 61 / 51 | $0.0077 | pass |
+
+Deferred CVEs found (package, installed version, band):
+
+- **markedjs/marked** Deferred: CVE-2026-101910 (ip-address 10.5.0, —), CVE-2026-101911 (ip-address 10.5.0, —), CVE-2026-101912 (ip-address 10.5.0, —), CVE-2026-101913 (ip-address 10.5.0, —), CVE-2026-102276 (brace-expansion 5.0.9, unlikely), CVE-2026-102277 (brace-expansion 5.0.9, possible), CVE-2026-102278 (brace-expansion 5.0.9, unlikely), CVE-2026-93748 (http-cache-semantics 4.2.0, unlikely)
+- **mochajs/mocha** Deferred: CVE-2025-14505 (elliptic 6.6.1, possible), CVE-2025-69873 (ajv 8.17.1, possible), CVE-2026-102276 (brace-expansion 2.0.2, unlikely), CVE-2026-102277 (brace-expansion 2.0.2, possible), CVE-2026-102278 (brace-expansion 2.0.2, unlikely), CVE-2026-102414 (pbkdf2 3.1.5, likely), CVE-2026-13149 (brace-expansion 2.0.2, —), CVE-2026-2739 (bn.js 4.12.2, possible), CVE-2026-45819 (baseline-browser-mapping 2.9.19, —), CVE-2026-84375 (js-yaml 3.14.2, unlikely), CVE-2026-9277 (shell-quote 1.8.1, possible)
+- **socketio/socket.io** Deferred: CVE-2024-12905 (tar-fs 3.0.4, unlikely), CVE-2024-36751 (parseuri 0.0.6, unlikely), CVE-2025-48387 (tar-fs 3.0.4, —), CVE-2025-59343 (tar-fs 3.0.4, —), CVE-2025-69873 (ajv 8.16.0, possible), CVE-2026-101911 (ip-address 9.0.5, —), CVE-2026-101912 (ip-address 9.0.5, —), CVE-2026-101913 (ip-address 9.0.5, —), CVE-2026-102276 (brace-expansion 1.1.12, unlikely), CVE-2026-102277 (brace-expansion 1.1.12, possible), CVE-2026-102278 (brace-expansion 1.1.12, unlikely), CVE-2026-102990 (basic-ftp 5.0.5, —), CVE-2026-13149 (brace-expansion 1.1.12, —), CVE-2026-19693 (extract-zip 2.0.1, unlikely), CVE-2026-40345 (deepmerge-ts 5.1.0, —), CVE-2026-44240 (basic-ftp 5.0.5, unlikely), CVE-2026-45819 (baseline-browser-mapping 2.8.15, —), CVE-2026-59875 (tar 6.2.1, possible), CVE-2026-73566 (tar 6.2.1, unlikely), CVE-2026-84375 (js-yaml 3.14.1, unlikely), CVE-2026-85393 (node-forge 1.3.1, unlikely), CVE-2026-93748 (http-cache-semantics 4.2.0, unlikely)

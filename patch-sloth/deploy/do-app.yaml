@@ -1,0 +1,56 @@
+# DigitalOcean App Platform spec for the Patch Sloth API + web page (SPEC §12).
+# Field names checked against docs.digitalocean.com/products/app-platform/reference/app-spec/ on 2026-10-24.
+# Create with the console (Create App -> import spec) or `doctl apps create --spec deploy/do-app.yaml`. [HUMAN]
+# The repo root holds the project in patch-sloth/, so source_dir (= Docker build context) is patch-sloth and
+# dockerfile_path is relative to the repo root.
+# Secrets: fill PAPERINSTRUMENTS_API_KEY (and, for Option A, VLLM_BASE_URL / VLLM_API_KEY) in the console; App
+# Platform encrypts SECRET values on first submit. Never commit real values here.
+name: patch-sloth
+region: nyc                      # GPU Droplets (Option A) run in NYC2/TOR1/ATL1; keep the app close to them
+services:
+  - name: api
+    github:
+      repo: MAUK9086/patch-sloth
+      branch: master
+      deploy_on_push: true
+    source_dir: patch-sloth
+    dockerfile_path: patch-sloth/deploy/Dockerfile
+    http_port: 8080
+    instance_count: 1
+    # ~0.6 GB RSS with the feed loaded (measured locally) + osv-scanner's in-memory DB: 1 GB is too tight
+    instance_size_slug: apps-s-1vcpu-2gb
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 20
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 6
+    envs:
+      - key: PATCHSLOTH_FEED_REPO        # feed + HGB fallback come from this repo's newest feed-* release
+        value: MAUK9086/patch-sloth
+        scope: RUN_TIME
+        type: GENERAL
+      - key: PATCHSLOTH_FEED_DOWNLOAD
+        value: "1"
+        scope: RUN_TIME
+        type: GENERAL
+      - key: PATCHSLOTH_LLM_BACKEND      # Option B: null (feed vectors only). Option A: vllm
+        value: "null"
+        scope: RUN_TIME
+        type: GENERAL
+      - key: PAPERINSTRUMENTS_API_KEY    # report writer; without it the template report is used
+        scope: RUN_TIME
+        type: SECRET
+      - key: VLLM_BASE_URL               # Option A only, e.g. http://<droplet-ip>:8000/v1
+        scope: RUN_TIME
+        type: SECRET
+      - key: VLLM_API_KEY                # Option A only; same value as on the Droplet
+        scope: RUN_TIME
+        type: SECRET
+ingress:
+  rules:
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /

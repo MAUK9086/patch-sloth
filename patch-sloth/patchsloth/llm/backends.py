@@ -22,16 +22,38 @@ class NullBackend:
 
 
 class VLLMBackend:
-    """OpenAI-compatible /v1/chat/completions on the GPU Droplet, model="patchsloth". Filled in at M6."""
+    """OpenAI-compatible /v1/chat/completions on the GPU Droplet (deploy/vllm-droplet.sh), model="patchsloth".
+    Same prompt as training: Qwen3's chat template with enable_thinking=False renders the same tokens as Tinker's
+    qwen3_disable_thinking renderer (checked on 200 test rows, DECISIONS.md). Greedy, max_tokens 48; parse failures
+    fall back to the CNA vector, as in scripts/06. scripts/12_vllm_parity.py compares the outputs with Tinker's."""
     name = "vllm"
 
-    def __init__(self, base_url: str = config.VLLM_BASE_URL, api_key: str = config.VLLM_API_KEY):
-        if not base_url:
+    def __init__(self, base_url: str | None = None, api_key: str | None = None, client=None,
+                 max_tokens: int = 48, concurrency: int = 8, timeout: float = 30):
+        base_url = base_url or config.VLLM_BASE_URL
+        api_key = api_key or config.VLLM_API_KEY
+        if not base_url and client is None:
             raise RuntimeError("VLLM_BASE_URL is not set")
-        self.base_url, self.api_key = base_url, api_key
+        if client is None:
+            from openai import OpenAI
+            client = OpenAI(base_url=base_url, api_key=api_key or "none", timeout=timeout, max_retries=1)
+        self.client, self.max_tokens, self.concurrency = client, max_tokens, concurrency
+
+    def complete(self, row) -> str:
+        from .prompt import messages
+        r = self.client.chat.completions.create(
+            model=config.VLLM_MODEL, messages=messages(row), temperature=0, max_tokens=self.max_tokens,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+        return r.choices[0].message.content or ""
 
     def predict_vectors(self, rows) -> list[str]:
-        raise NotImplementedError("VLLMBackend is implemented with the GPU deployment (M6)")
+        from concurrent.futures import ThreadPoolExecutor
+
+        from .prompt import parse_output
+        rows = list(rows)
+        with ThreadPoolExecutor(max_workers=self.concurrency) as ex:
+            texts = list(ex.map(self.complete, rows))
+        return [parse_output(t, r.cna_vector)[0] for t, r in zip(texts, rows)]
 
 
 class TinkerBackend:
