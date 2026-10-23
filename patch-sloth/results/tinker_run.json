@@ -1,0 +1,85 @@
+{
+ "base": "Qwen/Qwen3-8B",
+ "renderer": "qwen3_disable_thinking",
+ "rank": 32,
+ "lr": 0.0002,
+ "batch": 64,
+ "epochs": 1,
+ "n_train": 30000,
+ "dry_run": false,
+ "estimate": {
+  "train_tokens": 7659163,
+  "prefill_tokens": 9548973,
+  "n_samples": 42000,
+  "sample_tokens_max": 3296000,
+  "usd_train": 3.37003172,
+  "usd_prefill": 1.862049735,
+  "usd_sample_max": 1.9776,
+  "usd_total_max": 7.209681455
+ },
+ "training_run": {
+  "base": "Qwen/Qwen3-8B",
+  "renderer": "qwen3_disable_thinking",
+  "rank": 32,
+  "lr": 0.0002,
+  "batch": 64,
+  "epochs": 1,
+  "n_train": 30000,
+  "dry_run": false,
+  "estimate": {
+   "train_tokens": 7659163,
+   "prefill_tokens": 9548973,
+   "n_samples": 42000,
+   "sample_tokens_max": 3296000,
+   "usd_train": 3.37003172,
+   "usd_prefill": 1.862049735,
+   "usd_sample_max": 1.9776,
+   "usd_total_max": 7.209681455
+  },
+  "ft_path": "tinker://a6f950f3-e374-5e28-8fe0-dbbbbaa1742c:train:0/sampler_weights/patchsloth-taskA-final"
+ },
+ "ft_path": "tinker://a6f950f3-e374-5e28-8fe0-dbbbbaa1742c:train:0/sampler_weights/patchsloth-taskA-final",
+ "sampling": {
+  "ft_val": {
+   "n": 0,
+   "skipped": 8000,
+   "prefill": 0,
+   "cached": 0,
+   "gen": 0
+  },
+  "ft_test": {
+   "n": 0,
+   "skipped": 8000,
+   "prefill": 0,
+   "cached": 0,
+   "gen": 0
+  },
+  "base_val": {
+   "n": 0,
+   "skipped": 8000,
+   "prefill": 0,
+   "cached": 0,
+   "gen": 0
+  },
+  "base_test": {
+   "n": 8000,
+   "skipped": 0,
+   "prefill": 1832381,
+   "cached": 1004928,
+   "gen": 503933
+  },
+  "ft_stack_train": {
+   "n": 10000,
+   "skipped": 0,
+   "prefill": 2228965,
+   "cached": 1270400,
+   "gen": 340000
+  }
+ },
+ "spent_usd": {
+  "train": 0.0,
+  "prefill": 0.43701130200000005,
+  "sample": 0.5063598,
+  "total": 0.9433711020000001
+ }
+}
