@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.11.6",
+  "checkpoint_id": "01M5KDQT45RBMJC964PR4A0H5V",
+  "session_id": "19dcb0f0-854e-4e9d-8803-ce736db0162d",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-23T03:44:15.3854797Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "patch-sloth/DECISIONS.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "95e27283fc3d",
+  "checkpoint_transcript_start": 2055,
+  "transcript_lines_at_start": 2055,
+  "compact_transcript_start": 182,
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 353067,
+    "cache_read_tokens": 2682449,
+    "output_tokens": 6262,
+    "api_call_count": 8,
+    "subagent_tokens": {
+      "input_tokens": 10,
+      "cache_creation_tokens": 300325,
+      "cache_read_tokens": 445901,
+      "output_tokens": 24,
+      "api_call_count": 5
+    }
+  },
+  "session_metrics": {
+    "turn_count": 1
+  }
+}
