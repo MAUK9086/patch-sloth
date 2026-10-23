@@ -1,0 +1,34 @@
+{
+ "ultramarine": {
+  "acc_AV": 0.962,
+  "acc_AC": 0.927,
+  "acc_PR": 0.921,
+  "acc_UI": 0.947,
+  "acc_S": 0.956,
+  "acc_C": 0.908,
+  "acc_I": 0.909,
+  "acc_A": 0.904,
+  "exact_vector": 0.65,
+  "score_mae": 0.5255,
+  "severity_acc": 0.795,
+  "bump_precision": 0.2871287128712871,
+  "bump_recall": 0.28431372549019607,
+  "bump_f1": 0.2857142857142857,
+  "bump_base_rate": 0.102,
+  "severity_acc_ci95": [
+   0.771,
+   0.822
+  ],
+  "bump_f1_ci95": [
+   0.20296954314720814,
+   0.3663948076835333
+  ],
+  "json_valid": 0.992,
+  "n": 1000,
+  "mcnemar_vs_copy_cna_severity": {
+   "a_only": 32,
+   "b_only": 111,
+   "p_value": 6.905856799604359e-11
+  }
+ }
+}
