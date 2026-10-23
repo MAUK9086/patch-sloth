@@ -4,7 +4,9 @@ eff_sev = max(cna_sev, predicted_sev if p_bump >= tau else cna_sev)
 P0 "Patch now":       in KEV, or EPSS >= 0.10, or (eff_sev >= HIGH and p_bump >= tau_high and a fix exists)
 P1 "This month":      eff_sev >= HIGH, or p_bump >= tau
 P2 "Ignore for now":  everything else
-Extension: for CVEs NVD already analysed (source="nvd"), the NVD-final vector counts as known (no threshold).
+Extension (approved 2026-10-23): for NIST-reviewed CVEs (source="nvd"), eff_sev = max(CNA, NVD-final) with no
+threshold, and no model prediction or p_bump is used for them.
+tau / tau_high come from results/thresholds.json (tau = top 10% of p_bump over Deferred CVEs, no labels).
 """
 from . import config
 from .cvss import SEV, base_score, parse, sev_rank
@@ -36,9 +38,10 @@ def prioritise(row: dict, tau: float | None = None, tau_high: float | None = Non
     epss = _num(row.get("epss"))
     kev = row.get("kev_date") if isinstance(row.get("kev_date"), str) and row.get("kev_date") else None
     fixed = row.get("fixed") or None
-    flagged = p is not None and p >= tau
-    # NVD already analysed it: its final vector is known, not predicted, so it counts without a threshold
+    # NIST-reviewed: NVD already analysed it, so its final vector is known (no threshold) and no model
+    # prediction or probability is used for it
     nvd_final = row.get("source") == "nvd" and pred_sev is not None
+    flagged = not nvd_final and p is not None and p >= tau
     base = cna_sev if cna_sev is not None else -1
     eff = max(base, pred_sev) if (flagged or nvd_final) and pred_sev is not None else base
 
@@ -49,18 +52,19 @@ def prioritise(row: dict, tau: float | None = None, tau_high: float | None = Non
         reasons.append(f"EPSS {epss:.2f} >= {config.EPSS_P0:.2f}")
     if cna_sev is None:
         reasons.append("no CNA CVSS v3.1 score")
-    if flagged:
+    if nvd_final:
+        reasons.append(f"NIST-reviewed: CNA {SEV[cna_sev] if cna_sev is not None else 'unscored'} / "
+                       f"NVD {SEV[pred_sev]}")
+    elif flagged:
         if pred_sev is not None and cna_sev is not None and pred_sev > cna_sev:
             reasons.append(f"likely under-rated: CNA {SEV[cna_sev]} -> predicted {SEV[pred_sev]} (p={p:.2f})")
         else:
             reasons.append(f"likely under-rated (p={p:.2f})")
-    elif nvd_final and cna_sev is not None and pred_sev != cna_sev:
-        reasons.append(f"NVD rated {SEV[pred_sev]} (CNA {SEV[cna_sev]})")
     elif cna_sev is not None:
         reasons.append(f"CNA {SEV[cna_sev]}")
 
     if kev or (epss is not None and epss >= config.EPSS_P0) or (
-            eff >= HIGH and p is not None and p >= tau_high and fixed):
+            eff >= HIGH and flagged and p >= tau_high and fixed):
         bucket = "P0"
     elif eff >= HIGH or flagged:
         bucket = "P1"

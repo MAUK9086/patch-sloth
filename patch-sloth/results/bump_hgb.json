@@ -9,7 +9,25 @@
   ],
   "roc_auc": 0.9599625082452,
   "brier": 0.06066010985968358,
-  "precision_at_top10pct": 0.9665236051502146
+  "precision_at_top10pct": 0.9665236051502146,
+  "at_tau": {
+   "threshold": 0.7378191746679973,
+   "flag_rate": 0.18421278421278423,
+   "precision": 0.904052165812762,
+   "recall": 0.7332829618435965
+  },
+  "at_tau_high": {
+   "threshold": 0.7378191746679973,
+   "flag_rate": 0.18421278421278423,
+   "precision": 0.904052165812762,
+   "recall": 0.7332829618435965
+  },
+  "at_tau_val": {
+   "threshold": 0.07172519219311888,
+   "flag_rate": 0.383011583011583,
+   "precision": 0.5645161290322581,
+   "recall": 0.9520211560256895
+  }
  },
  "test": {
   "n": 30706,
@@ -22,15 +40,45 @@
   "roc_auc": 0.9025689481172889,
   "brier": 0.05922594996054297,
   "precision_at_top10pct": 0.5293159609120521,
-  "recall_at_tau": 0.8635566467905997,
-  "precision_at_tau": 0.28681267474370925
+  "at_tau": {
+   "threshold": 0.7378191746679973,
+   "flag_rate": 0.04445385266723116,
+   "precision": 0.706959706959707,
+   "recall": 0.3384777271132936
+  },
+  "at_tau_high": {
+   "threshold": 0.7378191746679973,
+   "flag_rate": 0.04445385266723116,
+   "precision": 0.706959706959707,
+   "recall": 0.3384777271132936
+  },
+  "at_tau_val": {
+   "threshold": 0.07172519219311888,
+   "flag_rate": 0.27955448446557674,
+   "precision": 0.28681267474370925,
+   "recall": 0.8635566467905997
+  }
  },
  "thresholds": {
-  "tau": 0.07172519219311888,
-  "tau_high": 0.44152513640273766,
+  "tau": 0.7378191746679973,
+  "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=48979); no labels",
+  "tau_high": 0.7378191746679973,
+  "tau_high_rule": "val published >= 2025-09-30: largest flag set with precision >= 0.75, floored at tau",
   "model": "hgb",
-  "tuned_on": "val published >= 2025-09-30",
   "n_tune": 5614,
   "base_rate_tune": 0.19077306733167082
+ },
+ "drift_finding": {
+  "tau_val": 0.07172519219311888,
+  "rule": "SPEC \u00a79.2 literal: precision >= 0.5 on the last 3 months of val",
+  "val_recent_base_rate": 0.19077306733167082,
+  "test_base_rate": 0.0928483032632059,
+  "test_at_tau_val": {
+   "threshold": 0.07172519219311888,
+   "flag_rate": 0.27955448446557674,
+   "precision": 0.28681267474370925,
+   "recall": 0.8635566467905997
+  },
+  "note": "val-tuned threshold transfers badly to 2026: the bump base rate halved, so precision at tau_val drops"
  }
 }

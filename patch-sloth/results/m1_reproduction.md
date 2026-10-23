@@ -48,6 +48,16 @@ refactor (train-fitted vocabularies) did not move the numbers.
 |---|---|---|
 | HGB | 0.072 | 0.442 |
 
-**Finding (needs a human decision):** on test (2026), HGB at τ = 0.072 has **precision 0.287 and recall 0.864**. That
-falls short of the 0.5 target, because the 2026 base rate (0.093) is half that of the tuning window (0.191). The
-threshold was not tuned on test. The options are recorded in DECISIONS.md.
+**Finding:** on test (2026), HGB at τ = 0.072 has **precision 0.287 and recall 0.864**. That falls short of the 0.5
+target, because the 2026 base rate (0.093) is half that of the tuning window (0.191). This is kept as the drift
+finding in `results/tau_drift.json`.
+
+**Decision (2026-10-23):** serving τ = the 90th percentile of p_bump over the Deferred population, using no labels
+(see DECISIONS.md).
+
+| τ rule | τ | Test flagged | Test precision | Test recall |
+|---|---|---|---|---|
+| top 10% of Deferred p_bump (serving) | 0.738 | 4.4% | **0.707** | 0.338 |
+| val, precision ≥ 0.5 (SPEC literal, drift finding) | 0.072 | 28.0% | 0.287 | 0.864 |
+
+τ_high = max(τ, val rule at precision ≥ 0.75 = 0.442) = 0.738.

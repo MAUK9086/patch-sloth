@@ -36,6 +36,18 @@ def test_faithful_text_passes():
     assert report.guardrail(text, facts()) == (True, [])
 
 
+def test_nist_reviewed_row_shows_both_severities_and_no_prediction():
+    row = dict(cve="CVE-2026-3333", package="lodash", version="4.17.20", fixed="4.18.0",
+               cna_vector=MED, predicted_vector=HIGH, p_bump=0.9, source="nvd")
+    rows = prioritise_all([row], tau=0.3, tau_high=0.7)
+    pl = report.build_payload(rows)
+    r = pl["rows"][0]
+    assert r["nist_reviewed"] and r["p_bump"] is None and r["predicted_vector"] is None
+    assert r["nvd_severity"] == "HIGH" and r["cna_severity"] == "MEDIUM"
+    md = report.template_report(pl)
+    assert "NIST-reviewed: CNA MEDIUM / NVD HIGH" in md and "p(higher)" not in md
+
+
 def test_fake_cve_is_caught():
     ok, bad = report.guardrail("Also patch CVE-2024-99999 right away.", facts())
     assert not ok and "CVE-2024-99999" in bad

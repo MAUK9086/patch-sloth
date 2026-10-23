@@ -49,6 +49,19 @@ def predict(mask):
     return tabular.predict_proba(clf, X[mask])
 
 
+def at(yy, p, t):
+    """Flag rate, precision and recall of the flagged set p >= t (labels only used for reporting)."""
+    flag = p >= t
+    return dict(threshold=float(t), flag_rate=float(flag.mean()),
+                precision=float(yy[flag].mean()) if flag.any() else 0.0,
+                recall=float(yy[flag].sum() / max(yy.sum(), 1)))
+
+
+# tau: top 10% of the population the product actually scores (Deferred, no labels), the same cutoff
+# serve time applies. No test (or val) labels are used to choose it.
+m_def = (df.split == "deferred_unlabeled").to_numpy()
+p_def = predict(m_def)
+tau = float(np.quantile(p_def, 0.90))
 out = {}
 rng = np.random.default_rng(0)
 for split in ["val", "test"]:
@@ -63,26 +76,32 @@ for split in ["val", "test"]:
                       roc_auc=roc_auc_score(yy, p), brier=brier_score_loss(yy, p),
                       precision_at_top10pct=yy[top].mean())
     if split == "val":
-        # thresholds on the most recent 3 months of val, closest to the 2026 base rate (SPEC §9.2)
+        # SPEC §9.2 rule on the most recent 3 months of val. Kept for tau_high, and tau_val is kept as the
+        # drift finding (it is NOT the serving tau: on 2026 its precision collapses)
         pub = df.published[m].to_numpy()
         recent = pub >= str((pd.Timestamp(df.published[m].max()) - pd.DateOffset(months=3)).date())
-        tau = tabular.choose_tau(yy[recent], p[recent], min_precision=0.5)
+        tau_val = tabular.choose_tau(yy[recent], p[recent], min_precision=0.5)
         tau_high = max(tau, tabular.choose_tau(yy[recent], p[recent], min_precision=0.75))
-        thr = dict(tau=tau, tau_high=tau_high, model=tag, tuned_on=f"val published >= {pub[recent].min()}",
-                   n_tune=int(recent.sum()), base_rate_tune=float(yy[recent].mean()))
-    else:
-        flag = p >= thr["tau"]
-        out[split]["recall_at_tau"] = float(yy[flag].sum() / max(yy.sum(), 1))
-        out[split]["precision_at_tau"] = float(yy[flag].mean()) if flag.any() else 0.0
-    print(split, {k_: (np.round(v_, 3) if not isinstance(v_, tuple) else tuple(np.round(v_, 3)))
-                  for k_, v_ in out[split].items()})
+        thr = dict(tau=tau, tau_rule=f"90th percentile of p_bump over deferred_unlabeled (n={int(m_def.sum())}); "
+                                     "no labels", tau_high=tau_high,
+                   tau_high_rule=f"val published >= {pub[recent].min()}: largest flag set with precision >= 0.75, "
+                                 "floored at tau", model=tag, n_tune=int(recent.sum()),
+                   base_rate_tune=float(yy[recent].mean()))
+    out[split].update(at_tau=at(yy, p, tau), at_tau_high=at(yy, p, tau_high), at_tau_val=at(yy, p, tau_val))
+    print(split, {k_: (np.round(v_, 3) if isinstance(v_, float) else v_) for k_, v_ in out[split].items()})
 out["thresholds"] = thr
+out["drift_finding"] = dict(
+    tau_val=tau_val, rule="SPEC §9.2 literal: precision >= 0.5 on the last 3 months of val",
+    val_recent_base_rate=thr["base_rate_tune"], test_base_rate=float(out["test"]["base_rate"]),
+    test_at_tau_val=out["test"]["at_tau_val"],
+    note="val-tuned threshold transfers badly to 2026: the bump base rate halved, so precision at tau_val drops")
 print("thresholds", thr)
+print("drift", out["drift_finding"])
 # score the real target population: Deferred CVEs nobody independently checked
-m = (df.split == "deferred_unlabeled").to_numpy()
-pd.DataFrame({"cve": df.cve[m], "cna": df.cna[m], "cna_vector": df.cna_vector[m], "p_bump": predict(m)}) \
+pd.DataFrame({"cve": df.cve[m_def], "cna": df.cna[m_def], "cna_vector": df.cna_vector[m_def], "p_bump": p_def}) \
   .sort_values("p_bump", ascending=False).to_csv(f"results/deferred_scored_{tag}.csv", index=False)
 json.dump(out, open(f"results/bump_{tag}.json", "w"), indent=1, default=float)
 if a.model == "hgb" and not a.with_llm:  # the CPU serve-time fallback
     print("saved", tabular.BumpModel(fb, clf, "hgb").save())
     Path("results/thresholds.json").write_text(json.dumps(thr, indent=1))
+    Path("results/tau_drift.json").write_text(json.dumps(out["drift_finding"], indent=1, default=float))

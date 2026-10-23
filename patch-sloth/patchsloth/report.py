@@ -27,6 +27,8 @@ probabilities: only use values present in the JSON or returned by tools, written
 Fields: cna_* is the reporter's (CNA's) own score. nvd_* is NVD's official analysis (only when NVD analysed it).
 predicted_* is a model estimate. p_bump is the estimated probability that an independent NVD-style reviewer
 would raise the CNA's severity band. counts.packages is the number of affected packages.
+Rows with nist_reviewed=true were already analysed by NIST/NVD: label them "NIST-reviewed", show the CNA and NVD
+severities side by side, and give no model prediction or probability for them.
 Structure:
 1. A 3-line summary.
 2. A "P0: Patch now" table, then "P1: This month" (columns: CVE, package, installed, fix, why).
@@ -104,14 +106,14 @@ def build_payload(rows: list[dict], data_as_of: str | None = None, epss_date: st
         pv = r.get("predicted_vector")
         out.append(dict(
             cve=r["cve"], package=r.get("package"), version=r.get("version"), fixed=r.get("fixed"),
-            bucket=r["bucket"], reason=list(r.get("reason", [])), source=r.get("source"),
+            bucket=r["bucket"], reason=list(r.get("reason", [])), source=r.get("source"), nist_reviewed=nvd,
             cna_vector=r.get("cna_vector"), cna_score=_score(r.get("cna_vector")),
             cna_severity=_sev(r.get("cna_vector")),
             nvd_vector=pv if nvd else None, nvd_score=_score(pv) if nvd else None,
             nvd_severity=_sev(pv) if nvd else None,
             predicted_vector=None if nvd else pv, predicted_score=None if nvd else _score(pv),
             predicted_severity=None if nvd else _sev(pv),
-            p_bump=_r(r.get("p_bump"), 2), epss=_r(r.get("epss"), 3), kev_date=r.get("kev_date")))
+            p_bump=None if nvd else _r(r.get("p_bump"), 2), epss=_r(r.get("epss"), 3), kev_date=r.get("kev_date")))
     counts = {b: sum(r["bucket"] == b for r in out) for b in ("P0", "P1", "P2")}
     counts["packages"] = len({(r["package"], r["version"]) for r in out})
     counts["likely_underrated"] = sum(any("under-rated" in x for x in r["reason"]) for r in out)
@@ -121,8 +123,8 @@ def build_payload(rows: list[dict], data_as_of: str | None = None, epss_date: st
 def _opinion(r: dict) -> str:
     """What the second-opinion cell can honestly say for this row."""
     p = f"p(higher)={r['p_bump']}" if r["p_bump"] is not None else ""
-    if r["source"] == "nvd":
-        return f"NVD: {r['nvd_severity']}"
+    if r["nist_reviewed"]:
+        return f"NIST-reviewed: CNA {r['cna_severity'] or 'unscored'} / NVD {r['nvd_severity']}"
     if r["source"] in ("model", "model-on-demand"):
         if r["predicted_vector"] and r["predicted_vector"] != r["cna_vector"]:  # an LLM vector exists
             return f"{r['predicted_severity']} ({p})" if p else r["predicted_severity"]

@@ -8,6 +8,10 @@ Usage:
   python scripts/05_tinker_train.py --estimate_only    # exact token counts + projected cost, no API calls
   python scripts/05_tinker_train.py                    # full run: 1 epoch, eval_n=8000, n_stack=10000
   python scripts/05_tinker_train.py --model_path tinker://.../sampler_weights/... --skip_train   # eval only
+  python scripts/05_tinker_train.py --resume_state tinker://.../weights/step-200   # resume training
+Resumability: save_state (weights + optimizer) every --save_every steps, path logged to results/tinker_ckpt*.jsonl;
+--resume_state restarts from it (same data order and LR schedule). Sampling skips CVEs already written,
+so re-running with --skip_train after a crash only pays for what is missing.
 """
 import argparse
 import json
@@ -38,6 +42,8 @@ ap.add_argument("--dry_run", action="store_true")
 ap.add_argument("--estimate_only", action="store_true")
 ap.add_argument("--skip_train", action="store_true")
 ap.add_argument("--model_path", default=None, help="tinker://... sampler weights to evaluate (with --skip_train)")
+ap.add_argument("--save_every", type=int, default=100, help="save_state (weights + optimizer) every N steps")
+ap.add_argument("--resume_state", default=None, help="tinker://.../weights/step-N saved by --save_every")
 a = ap.parse_args()
 
 import tinker  # noqa: E402
@@ -103,15 +109,28 @@ if a.skip_train:
     if not a.model_path:
         sys.exit("--skip_train needs --model_path")
     ft_path = a.model_path
+    prev = Path(f"results/tinker_run{TAG}.json")
+    if prev.exists():  # keep the training record of the run that produced these weights
+        run["training_run"] = json.loads(prev.read_text())
 else:
-    tc = svc.create_lora_training_client(base_model=a.base, rank=a.rank, seed=0)
+    start = 0
+    if a.resume_state:  # new training client from the saved weights + optimizer state
+        tc = svc.create_training_client_from_state_with_optimizer(a.resume_state)
+        start = int(a.resume_state.rstrip("/").rsplit("step-", 1)[1])
+        print(f"resumed from {a.resume_state} at step {start}")
+    else:
+        tc = svc.create_lora_training_client(base_model=a.base, rank=a.rank, seed=0)
     log = open(f"results/tinker_train_log{TAG}.jsonl", "a", encoding="utf-8")
+    ckpt_log = open(f"results/tinker_ckpt{TAG}.jsonl", "a", encoding="utf-8")
     steps_per_epoch = (len(data) + a.batch - 1) // a.batch
     total, step, t0 = steps_per_epoch * a.epochs, 0, time.time()
     for ep in range(a.epochs):
         order = list(range(len(data)))
-        random.Random(ep).shuffle(order)
+        random.Random(ep).shuffle(order)  # deterministic, so a resumed run sees the same batches
         for i in range(0, len(order), a.batch):
+            if step < start:  # already trained before the checkpoint
+                step += 1
+                continue
             batch = [data[j] for j in order[i:i + a.batch]]
             lr = a.lr * (1 - step / total)  # linear decay to 0 over the whole run
             fb = tc.forward_backward(batch, "cross_entropy")
@@ -126,9 +145,15 @@ else:
                            elapsed_s=round(time.time() - t0, 1))
                 log.write(json.dumps(rec, default=float) + "\n")
                 log.flush()
-                print("step", step, "/", total, r.metrics, f"${spent['train']:.3f}")
-    costs.log("tinker", a.base, int(train_tokens), 0, time.time() - t0, spent["train"], task=f"sft{TAG}",
-              train_tokens=int(train_tokens), steps=step)
+                print("step", step, "/", total, r.metrics, f"${spent['train']:.3f}", flush=True)
+            if a.save_every and step % a.save_every == 0 and step < total:
+                path = tc.save_state(f"step-{step}", ttl_seconds=14 * 86400).result().path
+                ckpt_log.write(json.dumps(dict(step=step, path=path)) + "\n")
+                ckpt_log.flush()
+                print("checkpoint", path, flush=True)
+    trained = round(spent["train"] / P["train"] * 1e6)  # tokens actually trained in this process
+    costs.log("tinker", a.base, int(trained), 0, time.time() - t0, spent["train"], task=f"sft{TAG}",
+              train_tokens=int(trained), steps=step - start, resumed_from=a.resume_state)
     ft_path = tc.save_weights_for_sampler(name=f"patchsloth-taskA{TAG or '-final'}").result().path
     print("saved sampler weights:", ft_path)
 run["ft_path"] = ft_path
@@ -142,10 +167,15 @@ clients = {"ft": svc.create_sampling_client(model_path=ft_path),
 
 
 def predict(split, tag, n):
+    """Appends each prediction as it completes and skips CVEs already in the file (resumable)."""
     rows = load(split, n)
-    t0, out = time.time(), [None] * len(rows)
+    path = Path(f"results/llm_preds_{tag}_{split}{TAG}.jsonl")
+    done = {json.loads(line)["cve"] for line in open(path, encoding="utf-8")} if path.exists() else set()
+    todo = [i for i, x in enumerate(rows) if x["cve"] not in done]
+    t0 = time.time()
     pre = cached = gen = 0
     inflight: list[tuple[int, Future]] = []
+    f = open(path, "a", encoding="utf-8")
 
     def drain(k):
         nonlocal pre, cached, gen
@@ -153,27 +183,26 @@ def predict(split, tag, n):
             i, fut = inflight.pop(0)
             res = fut.result()
             seq = res.sequences[0]
-            out[i] = seq.tokens
+            f.write(json.dumps({"cve": rows[i]["cve"], "text": tok.decode(seq.tokens)}) + "\n")
             pre += prompts[split][i].length
             cached += getattr(res, "prompt_cache_hit_tokens", 0) or 0
             gen += len(seq.tokens)
+        f.flush()
 
-    for i in range(len(rows)):
+    for i in todo:
         inflight.append((i, clients[tag].sample(prompt=prompts[split][i], num_samples=1, sampling_params=params[tag])))
         drain(a.concurrency)
     drain(0)
-    with open(f"results/llm_preds_{tag}_{split}{TAG}.jsonl", "w", encoding="utf-8") as f:
-        for x, toks in zip(rows, out):
-            f.write(json.dumps({"cve": x["cve"], "text": tok.decode(toks)}) + "\n")
+    f.close()
     usd_pre = ((pre - cached) * P["prefill"] + cached * P["prefill_cached"]) / 1e6
     usd_gen = gen * P["sample"] / 1e6
     spent["prefill"] += usd_pre
     spent["sample"] += usd_gen
     costs.log("tinker", a.base, pre, gen, time.time() - t0, usd_pre + usd_gen, task=f"sample_{tag}_{split}{TAG}",
-              cached_input_tokens=cached, n=len(rows))
-    print(f"{tag} {split}: n={len(rows)} prefill={pre} (cached {cached}) gen={gen} "
-          f"mean_gen={gen / max(len(rows), 1):.1f} ${usd_pre + usd_gen:.4f}")
-    return dict(n=len(rows), prefill=pre, cached=cached, gen=gen)
+              cached_input_tokens=cached, n=len(todo), skipped=len(done))
+    print(f"{tag} {split}: n={len(todo)} (skipped {len(done)} done) prefill={pre} (cached {cached}) gen={gen} "
+          f"mean_gen={gen / max(len(todo), 1):.1f} ${usd_pre + usd_gen:.4f}", flush=True)
+    return dict(n=len(todo), skipped=len(done), prefill=pre, cached=cached, gen=gen)
 
 
 run["sampling"] = {f"{tag}_{s}": predict(s, tag, n) for s, tag, n in eval_sets}

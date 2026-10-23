@@ -64,11 +64,17 @@ def test_no_cna_score():
     assert r["bucket"] == "P2" and "no CNA CVSS v3.1 score" in r["reason"]
 
 
-def test_nvd_final_severity_counts_without_threshold():
+def test_nist_reviewed_severity_counts_without_threshold():
     r = p(source="nvd", cna_vector=MED, predicted_vector=HIGH, p_bump=None)
-    assert r["bucket"] == "P1" and r["eff_sev"] == "HIGH" and "NVD rated HIGH (CNA MEDIUM)" in r["reason"]
+    assert r["bucket"] == "P1" and r["eff_sev"] == "HIGH" and "NIST-reviewed: CNA MEDIUM / NVD HIGH" in r["reason"]
     # NVD lowering the band never lowers the priority (max, as in §11.3)
     assert p(source="nvd", cna_vector=HIGH, predicted_vector=MED)["eff_sev"] == "HIGH"
+
+
+def test_nist_reviewed_ignores_model_probability():
+    r = p(source="nvd", cna_vector=MED, predicted_vector=MED, p_bump=0.99, fixed="1.0.0")
+    assert r["bucket"] == "P2" and not any("under-rated" in x for x in r["reason"])
+    assert "NIST-reviewed: CNA MEDIUM / NVD MEDIUM" in r["reason"]
 
 
 def test_sort_order():
