@@ -21,6 +21,7 @@ from . import config
 from .cvss import base_score, parse, severity
 from .data import epss as epss_mod
 from .data.nvd import label_vector, parse_record
+from .features import LLM_INPUT
 from .llm.backends import get_backend
 from .tabular import BumpModel
 
@@ -38,8 +39,12 @@ def _sev(v):
     return severity(base_score(parse(v))) if isinstance(v, str) else None
 
 
-def score_rows(df: pd.DataFrame, model: BumpModel | None, backend=None) -> pd.DataFrame:
-    """Adds predicted_vector, p_bump, source to rows shaped like cves.parquet (or parse_record output)."""
+def score_rows(df: pd.DataFrame, model: BumpModel | None, backend=None,
+               tabular: BumpModel | None = None) -> pd.DataFrame:
+    """Adds predicted_vector, p_bump, source (+ band columns) to rows shaped like cves.parquet (or parse_record
+    output). A stacked model (features include the LLM vector) scores only rows that have an LLM vector; the rest go
+    to `tabular`, because a missing LLM vector must not read as "the LLM agreed with the CNA". A model with `gate_t`
+    makes the second opinion the LLM vector only when its p_bump >= gate_t, else the CNA vector (gated override)."""
     df = df.copy()
     backend = backend or get_backend("null")
     unanalysed = df.status.isin(config.UNANALYSED_STATUSES) & df.cna_vector.map(lambda v: isinstance(v, str))
@@ -47,36 +52,55 @@ def score_rows(df: pd.DataFrame, model: BumpModel | None, backend=None) -> pd.Da
     labels = [label_vector(s, c, n) for s, c, n in zip(df.status, df.cna_vector, nvd)]
     df["predicted_vector"] = labels
     df["p_bump"] = np.nan
+    for c in BAND_COLUMNS:
+        df[c] = None
     df["source"] = np.where(pd.Series(labels, index=df.index).notna(), "nvd", "none")
     if unanalysed.any():
-        u = df[unanalysed]
-        df.loc[unanalysed, "predicted_vector"] = backend.predict_vectors(list(u.itertuples()))
-        if model is not None:
-            p = model.predict(u)
-            df.loc[unanalysed, "p_bump"] = p
-            df.loc[unanalysed, "bump_model"] = model.name
-            bands = getattr(model, "bands", None)  # models saved before scripts/15 have none
+        u = df[unanalysed].copy()
+        llm = [v if isinstance(v, str) else None for v in backend.predict_vectors(list(u.itertuples()))]
+        has = np.array([v is not None for v in llm]) & (backend.name != "null")
+        cna = u.cna_vector.to_numpy(dtype=object)
+        pv = np.where([v is not None for v in llm], np.array(llm, dtype=object), cna)
+        u[LLM_INPUT] = np.where(has, np.array(llm, dtype=object), None)
+        n = len(u)
+        p, cal = np.full(n, np.nan), np.full(n, np.nan)
+        name, band, high = (np.full(n, None, dtype=object) for _ in range(3))
+        stacked = model is not None and getattr(model.fb, "with_llm", False)
+        groups = [(model, has), (tabular, ~has)] if stacked else [(model, np.ones(n, bool))]
+        for m, mask in groups:
+            if m is None or not mask.any():
+                continue
+            pm = m.predict(u[mask])
+            p[mask], name[mask] = pm, m.name
+            bands = getattr(m, "bands", None)  # models saved before scripts/15 have none
             if bands is not None:
-                df.loc[unanalysed, "p_bump_cal"] = bands.calibrate(p)
-                df.loc[unanalysed, "bump_band"] = bands.band(p)
-                df.loc[unanalysed, "bump_high"] = p >= bands.tau_high
+                cal[mask], band[mask], high[mask] = bands.calibrate(pm), bands.band(pm), pm >= bands.tau_high
+            gate = getattr(m, "gate_t", None)
+            if gate is not None:
+                pv[mask] = np.where(pm >= gate, pv[mask], cna[mask])
+        df.loc[unanalysed, "predicted_vector"] = pv
+        df.loc[unanalysed, "p_bump"] = p
+        df.loc[unanalysed, "bump_model"] = name
+        if pd.notna(band).any():
+            df.loc[unanalysed, "p_bump_cal"] = cal
+            df.loc[unanalysed, "bump_band"] = band
+            df.loc[unanalysed, "bump_high"] = high
         df.loc[unanalysed, "source"] = "model"
-    for c in BAND_COLUMNS:
-        if c not in df:
-            df[c] = None
     df["llm_backend"] = np.where(df.source == "model", backend.name, None)
     return df
 
 
 def build(since: str | None = None, model_name: str = "hgb", no_llm: bool = True,
-          dataset: Path = config.CVES_PARQUET, out_dir: Path = config.FEED, fallback_model: str = "hgb") -> dict:
+          dataset: Path = config.CVES_PARQUET, out_dir: Path = config.FEED, fallback_model: str = "hgb",
+          backend_name: str | None = None, tabular_model: str = "tabpfn") -> dict:
     """Score the dataset and write the feed. `since` limits the CSV to CVEs published on/after a date."""
     df = pd.read_parquet(dataset)
     model = BumpModel.load(name=model_name)
-    backend = get_backend("null" if no_llm else None)
+    backend = get_backend("null" if no_llm else backend_name)
+    tabular = BumpModel.load(name=tabular_model) if getattr(model.fb, "with_llm", False) else None
     scores, score_date = epss_mod.load()
     df["epss"] = df.cve.map(scores)
-    df = score_rows(df, model, backend)
+    df = score_rows(df, model, backend, tabular)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     df[COLUMNS].to_parquet(out_dir / FEED_FILE.name, index=False)
@@ -94,10 +118,50 @@ def build(since: str | None = None, model_name: str = "hgb", no_llm: bool = True
     fb = BumpModel.load(name=fallback_model)
     meta = dict(data_as_of=as_of.read_text().strip() if as_of.exists() else None, epss_date=score_date,
                 model=model_name, fallback_model=fallback_model, llm_backend=backend.name,
-                bands={m.name: m.bands.as_dict() for m in (model, fb) if getattr(m, "bands", None) is not None},
+                tabular_model=tabular.name if tabular is not None else None,
+                gate_t=getattr(model, "gate_t", None),
+                n_by_model=df[df.source == "model"].bump_model.value_counts().to_dict(),
+                bands={m.name: m.bands.as_dict() for m in (model, tabular, fb)
+                       if m is not None and getattr(m, "bands", None) is not None},
                 n_rows=len(df), n_model=int((df.source == "model").sum()), n_csv=len(pub))
     (out_dir / META_FILE.name).write_text(json.dumps(meta, indent=1, default=float))
     return meta
+
+
+def download_latest_release(repo: str = config.FEED_REPO, out_dir: Path = config.FEED,
+                            models_dir: Path = config.MODELS, timeout: float = 60) -> str | None:
+    """Fetch the newest GitHub release tagged feed-* into out_dir (the HGB fallback model goes to models_dir).
+    Skips the download when out_dir already holds that tag. Returns the tag in use, or None on failure; the app
+    then serves whatever local feed it has. Trust: bump_hgb.joblib is unpickled, so only point
+    PATCHSLOTH_FEED_REPO at a repo you control."""
+    out_dir, models_dir = Path(out_dir), Path(models_dir)
+    try:
+        req = urllib.request.Request(f"https://api.github.com/repos/{repo}/releases?per_page=30",
+                                     headers={"Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            rels = [r for r in json.load(resp) if r["tag_name"].startswith("feed-") and not r.get("draft")]
+        if not rels:
+            return None
+        rel = max(rels, key=lambda r: (r["tag_name"], r["published_at"] or ""))
+        tag_file = out_dir / "release_tag.txt"
+        have = tag_file.read_text().strip() if tag_file.exists() else None
+        if have == rel["tag_name"] and (out_dir / FEED_FILE.name).exists():
+            return rel["tag_name"]
+        assets = {x["name"]: x["browser_download_url"] for x in rel["assets"]}
+        out_dir.mkdir(parents=True, exist_ok=True)
+        models_dir.mkdir(parents=True, exist_ok=True)
+        for name in config.FEED_ASSETS:
+            if name not in assets:
+                continue
+            dest = (models_dir if name.endswith(".joblib") else out_dir) / name
+            tmp = dest.with_suffix(dest.suffix + ".part")
+            urllib.request.urlretrieve(assets[name], tmp)
+            tmp.replace(dest)
+        tag_file.write_text(rel["tag_name"] + "\n")
+        return rel["tag_name"]
+    except Exception as e:  # offline or rate-limited: keep serving the local feed
+        print(f"feed download from {repo} failed: {e}")
+        return None
 
 
 class Feed:

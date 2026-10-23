@@ -81,3 +81,28 @@ n = 31,198, base rate 0.092
 | HistGBT, train 2024+ only vs HistGBT (all 80k train) | s0: -0.019 [-0.026, -0.012]; s1: -0.020 [-0.027, -0.013]; s2: -0.012 [-0.019, -0.006] | hgb_full better |
 | TabPFN-3.5, train 2024+ only (50k) vs TabPFN-3.5 (50k subsample) | s0: -0.002 [-0.008, +0.003]; s1: -0.008 [-0.014, -0.002]; s2: -0.006 [-0.012, -0.001] | no significant difference |
 | TabPFN-3.5 (50k subsample) vs HistGBT (all 80k train) | s0: +0.008 [+0.001, +0.014]; s1: +0.011 [+0.004, +0.019]; s2: +0.014 [+0.005, +0.021] | tabpfn_50k better |
+
+## Sample efficiency (8k eval test rows)
+
+n = 8,000, base rate 0.095
+
+| Model | PR-AUC (mean of seeds) | 95% CI (seed 0) | seed sd | ROC-AUC | Brier | Precision top 10% |
+|---|---|---|---|---|---|---|
+| HistGBT (5k) | 0.534 | 0.496–0.571 | 0.019 | 0.883 | 0.0661 | 0.498 |
+| HistGBT (10k) | 0.564 | 0.534–0.606 | 0.005 | 0.893 | 0.0626 | 0.520 |
+| TabPFN-3.5 (5k) | 0.602 | 0.570–0.641 | 0.008 | 0.902 | 0.0595 | 0.547 |
+| HistGBT (30k) | 0.612 | 0.580–0.649 | 0.004 | 0.907 | 0.0580 | 0.550 |
+| TabPFN-3.5 (10k) | 0.614 | 0.580–0.651 | 0.002 | 0.903 | 0.0597 | 0.553 |
+| TabPFN-3.5 (30k) | 0.625 | 0.591–0.661 | 0.002 | 0.908 | 0.0580 | 0.556 |
+| HistGBT (all 80k train) | 0.627 | 0.596–0.664 | 0.003 | 0.910 | 0.0575 | 0.574 |
+| TabPFN-3.5 (50k subsample) | 0.631 | 0.592–0.662 | 0.003 | 0.911 | 0.0580 | 0.558 |
+
+| A vs B | ΔPR-AUC per seed [95% CI] | Verdict |
+|---|---|---|
+| TabPFN-3.5 (5k) vs HistGBT (all 80k train) | s0: -0.024 [-0.042, -0.008]; s1: -0.036 [-0.054, -0.019]; s2: -0.015 [-0.033, +0.001] | no significant difference |
+| TabPFN-3.5 (10k) vs HistGBT (all 80k train) | s0: -0.014 [-0.029, -0.000]; s1: -0.015 [-0.032, -0.001]; s2: -0.009 [-0.025, +0.006] | no significant difference |
+| TabPFN-3.5 (30k) vs HistGBT (all 80k train) | s0: -0.004 [-0.018, +0.010]; s1: -0.004 [-0.018, +0.010]; s2: +0.001 [-0.015, +0.015] | no significant difference |
+| TabPFN-3.5 (50k subsample) vs HistGBT (all 80k train) | s0: -0.003 [-0.016, +0.011]; s1: +0.007 [-0.008, +0.021]; s2: +0.009 [-0.008, +0.024] | no significant difference |
+| TabPFN-3.5 (5k) vs HistGBT (5k) | s0: +0.073 [+0.052, +0.093]; s1: +0.080 [+0.056, +0.103]; s2: +0.052 [+0.034, +0.068] | tabpfn_5k better |
+| TabPFN-3.5 (10k) vs HistGBT (10k) | s0: +0.047 [+0.029, +0.065]; s1: +0.054 [+0.032, +0.074]; s2: +0.051 [+0.032, +0.071] | tabpfn_10k better |
+| TabPFN-3.5 (30k) vs HistGBT (30k) | s0: +0.013 [-0.002, +0.027]; s1: +0.017 [+0.001, +0.031]; s2: +0.009 [-0.006, +0.022] | no significant difference |

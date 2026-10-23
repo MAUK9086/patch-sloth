@@ -139,7 +139,48 @@ comps = [("hgb_30k", "hgb_full"), ("hgb_noes_full", "hgb_full"), ("hgb_noes_30k"
          ("hgb_recent", "hgb_full"), ("tabpfn_recent", "tabpfn_50k"), ("tabpfn_50k", "hgb_full")]
 table["comparisons"] = [compare(scores, y, idx, a, b) for a, b in comps if a in scores and b in scores]
 result["anomaly_test_all"] = table
+# sample efficiency: learning curves on the 8k eval test rows, and TabPFN at n vs HGB on all 80k rows
+CURVE = {"tabpfn": [("tabpfn_5k", 5000), ("tabpfn_10k", 10000), ("tabpfn_30k", 30000), ("tabpfn_50k", 50000)],
+         "hgb": [("hgb_5k", 5000), ("hgb_10k", 10000), ("hgb_30k", 30000), ("hgb_full", 80098)]}
+rows = list(llm["test"])
+table, scores, y, idx = evaluate(rows, "test_eval_curve", [c for v in CURVE.values() for c, _ in v])
+comps = [(t, "hgb_full") for t in ["tabpfn_5k", "tabpfn_10k", "tabpfn_30k", "tabpfn_50k"]] + \
+        [("tabpfn_5k", "hgb_5k"), ("tabpfn_10k", "hgb_10k"), ("tabpfn_30k", "hgb_30k")]
+table["comparisons"] = [compare(scores, y, idx, a, b) for a, b in comps if a in scores and b in scores]
+table["curve"] = {m: [dict(config=c, n_train=n, **{k: table["models"][c][k] for k in
+                                                     ["pr_auc_mean", "pr_auc_sd", "pr_auc_ci95_seed0", "per_seed_pr_auc"]})
+                      for c, n in v if c in table["models"]] for m, v in CURVE.items()}
+result["sample_efficiency"] = table
 (R / "m4_comparison.json").write_text(json.dumps(result, indent=1))
+
+import matplotlib  # noqa: E402
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+fig, ax = plt.subplots(figsize=(6.4, 4.2))
+for m, label, c in [("tabpfn", "TabPFN-3.5", "C0"), ("hgb", "HistGBT", "C1")]:
+    pts = table["curve"][m]
+    ns = [q["n_train"] for q in pts]
+    ax.plot(ns, [q["pr_auc_mean"] for q in pts], "o-", color=c, label=f"{label} (mean of 3 seeds)")
+    lo, hi = np.array([q["pr_auc_ci95_seed0"] for q in pts]).T
+    ax.fill_between(ns, lo, hi, color=c, alpha=0.15)
+    for q in pts:
+        ax.scatter([q["n_train"]] * len(q["per_seed_pr_auc"]), q["per_seed_pr_auc"], color=c, s=8, alpha=0.6)
+ax.axhline(table["base_rate"], color="grey", ls=":", label="base rate")
+ticks = sorted({q["n_train"] for v in table["curve"].values() for q in v})
+ax.set_xscale("log")
+ax.set_xticks(ticks, [f"{t // 1000}k" for t in ticks])
+ax.minorticks_off()
+ax.set_xlabel("training rows (n_train)")
+ax.set_ylabel("PR-AUC on 2026 test (8,000 eval rows)")
+ax.set_title("Sample efficiency: TabPFN-3.5 vs HistGBT", fontsize=11)
+ax.legend(fontsize=8, loc="lower right")
+ax.grid(alpha=0.3)
+fig.text(0.01, 0.01, f"Bands: 95% bootstrap CI (seed 0); dots: seeds. Data as of {result['data_as_of']}.",
+         fontsize=7, color="grey")
+fig.tight_layout()
+fig.savefig(R / "learning_curve.png", dpi=150)
 
 # markdown tables
 NAMES = {"copy_cna": "copy-CNA (never flags)", "lr_full": "Logistic regression (all train)",
@@ -149,7 +190,9 @@ NAMES = {"copy_cna": "copy-CNA (never flags)", "lr_full": "Logistic regression (
          "tabpfn_llm_stack": "**TabPFN-3.5 + LLM features (10k stack_train)**",
          "llm_ft_alone": "Fine-tuned Qwen3-8B alone (score delta)", "hgb_noes_full": "HistGBT, no early stopping (80k)",
          "hgb_noes_30k": "HistGBT, no early stopping (30k)", "hgb_recent": "HistGBT, train 2024+ only",
-         "tabpfn_recent": "TabPFN-3.5, train 2024+ only (50k)"}
+         "tabpfn_recent": "TabPFN-3.5, train 2024+ only (50k)",
+         "hgb_5k": "HistGBT (5k)", "hgb_10k": "HistGBT (10k)", "tabpfn_5k": "TabPFN-3.5 (5k)",
+         "tabpfn_10k": "TabPFN-3.5 (10k)", "tabpfn_30k": "TabPFN-3.5 (30k)"}
 
 
 def fmt(x, nd=3):
@@ -186,5 +229,7 @@ for split in ["test", "val"]:
            f"flags {b['flag_rate']:.1%} of rows.", ""] + comp_table(t) + [""]
 t = result["anomaly_test_all"]
 md += ["## HGB anomaly and recency (all test rows)", ""] + model_table(t) + [""] + comp_table(t) + [""]
+t = result["sample_efficiency"]
+md += ["## Sample efficiency (8k eval test rows)", ""] + model_table(t) + [""] + comp_table(t) + [""]
 (R / "m4_tables.md").write_text("\n".join(md))
 print("\n".join(md))

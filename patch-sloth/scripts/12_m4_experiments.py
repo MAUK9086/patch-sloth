@@ -35,6 +35,8 @@ CONFIGS = [
     ("lr_full", "logreg", "train", None, False),
     ("hgb_full", "hgb", "train", None, False),
     ("hgb_50k", "hgb", "train", 50000, False),
+    ("hgb_5k", "hgb", "train", 5000, False),
+    ("hgb_10k", "hgb", "train", 10000, False),
     ("hgb_30k", "hgb", "train", 30000, False),
     ("hgb_recent", "hgb", "recent", None, False),
     ("hgb_noes_full", "hgb_noes", "train", None, False),
@@ -43,6 +45,9 @@ CONFIGS = [
     ("hgb_llm_stack", "hgb", "stack", None, True),
     ("tabpfn_stack", "tabpfn", "stack", None, False),
     ("tabpfn_llm_stack", "tabpfn", "stack", None, True),
+    ("tabpfn_5k", "tabpfn", "train", 5000, False),
+    ("tabpfn_10k", "tabpfn", "train", 10000, False),
+    ("tabpfn_30k", "tabpfn", "train", 30000, False),
     ("tabpfn_50k", "tabpfn", "train", 50000, False),
     ("tabpfn_recent", "tabpfn", "recent", 50000, False),
 ]

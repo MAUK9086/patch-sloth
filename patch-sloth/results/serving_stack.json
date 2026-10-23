@@ -1,0 +1,54 @@
+{
+ "model": "stack (TabPFN-3.5 + LLM features, 10k stack_train, seed 0)",
+ "gate_t": 0.6682962357997895,
+ "gate_rule": "chosen on the last 3 months of val (M4, seed 0)",
+ "max_abs_diff_vs_m4": 0.0,
+ "tau": 0.7245019674301147,
+ "tau_high": 0.8675354987382888,
+ "tau_possible": 0.33344079554080963,
+ "rule": "label-free quantiles of p_bump over deferred_unlabeled: likely >= q90 (tau), possible >= q75, tau_high = q95",
+ "n_deferred": 49272,
+ "isotonic_fit_on": "val with LLM predictions, published >= 2025-09-30 (n=3878)",
+ "n_deferred_with_llm": 49272,
+ "n_deferred_all": 49272,
+ "test_eval_rows": {
+  "n": 8000,
+  "base_rate": 0.09475,
+  "bands": {
+   "likely": {
+    "share": 0.047,
+    "n": 376,
+    "observed_bump_rate": 0.7473404255319149
+   },
+   "possible": {
+    "share": 0.09325,
+    "n": 746,
+    "observed_bump_rate": 0.2935656836461126
+   },
+   "unlikely": {
+    "share": 0.85975,
+    "n": 6878,
+    "observed_bump_rate": 0.03751090433265484
+   }
+  },
+  "at_tau_high": {
+   "flag_rate": 0.02375,
+   "precision": 0.9157894736842105,
+   "recall": 0.22955145118733508
+  },
+  "gated_override": {
+   "t": 0.6682962357997895,
+   "override_rate": 0.0595,
+   "severity_acc": 0.89925,
+   "bump_precision": 0.7094017094017094,
+   "bump_recall": 0.43799472295514513
+  },
+  "gated_vs_copy_cna": {
+   "diff": 0.019750000000000045,
+   "ci95": [
+    0.014624999999999999,
+    0.024753125000000046
+   ]
+  }
+ }
+}

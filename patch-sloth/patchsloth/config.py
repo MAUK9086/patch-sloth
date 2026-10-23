@@ -29,6 +29,10 @@ UNANALYSED_STATUSES = ("Deferred", "Awaiting Analysis", "Received", "Undergoing 
 
 # Task B thresholds (SPEC §9.2, §11.3). Tuned on val by scripts/07 and written to results/thresholds.json.
 THRESHOLDS_FILE = RESULTS / "thresholds.json"
+# the published feed: GitHub releases tagged feed-YYYY-MM-DD; the app downloads the newest at start-up
+FEED_REPO = os.environ.get("PATCHSLOTH_FEED_REPO", "MAUK9086/patch-sloth")
+FEED_DOWNLOAD = os.environ.get("PATCHSLOTH_FEED_DOWNLOAD", "1").strip().lower() not in ("0", "false", "no", "off")
+FEED_ASSETS = ("second_opinion.parquet", "latest.csv", "meta.json", "bump_hgb.joblib")
 
 
 def thresholds() -> dict:

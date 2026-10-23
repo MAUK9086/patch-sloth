@@ -61,11 +61,14 @@ def cve(cve_id: str = typer.Argument(..., help="e.g. CVE-2026-12345")):
 @feed_app.command("build")
 def feed_build(since: str = typer.Option(None, help="Only CVEs published on/after YYYY-MM-DD in the CSV"),
                no_llm: bool = typer.Option(True, "--no-llm/--llm", help="HGB-only (CPU) or with the LLM backend"),
-               model: str = typer.Option("hgb", help="Bump model saved by scripts/15 (hgb | tabpfn)")):
+               model: str = typer.Option("hgb", help="Bump model saved by scripts/15 or 17 (hgb | tabpfn | stack)"),
+               backend: str = typer.Option(None, help="LLM backend with --llm (e.g. precomputed)"),
+               tabular_model: str = typer.Option("tabpfn", help="Scores rows without an LLM vector (stack only)")):
     """Score unanalysed CVEs and write feed/second_opinion.parquet + feed/latest.csv.
     Rebuild data/cves.parquet first with scripts/01_download.py and scripts/02_build_dataset.py."""
     from .feed import build
-    typer.echo(json.dumps(build(since=since, model_name=model, no_llm=no_llm), indent=1, default=float))
+    typer.echo(json.dumps(build(since=since, model_name=model, no_llm=no_llm, backend_name=backend,
+                                       tabular_model=tabular_model), indent=1, default=float))
 
 
 @app.command()

@@ -1,14 +1,16 @@
 """FastAPI app (SPEC §11.5): POST /scan, GET /cve/{id}, GET /feed/latest.csv, GET /health, and the web page."""
+import asyncio
 import re
 import threading
 import time
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from . import config, service
-from .feed import CSV_FILE, Feed
+from .feed import CSV_FILE, Feed, download_latest_release
 
 CVE_ID = re.compile(r"^CVE-\d{4}-\d{4,}$")
 
@@ -32,11 +34,19 @@ class RateLimiter:
 
 
 def create_app(feed: Feed | None = None, scan_kwargs: dict | None = None,
-               rate_limit: int = config.RATE_LIMIT_PER_MIN) -> FastAPI:
-    """scan_kwargs are passed to service.run (tests inject a fixture advisory index, use_llm=False, ...)."""
+               rate_limit: int = config.RATE_LIMIT_PER_MIN, download: bool = False) -> FastAPI:
+    """scan_kwargs are passed to service.run (tests inject a fixture advisory index, use_llm=False, ...).
+    download=True fetches the newest feed-* GitHub release at server start-up (the deployed app)."""
+    state = {"feed": feed, "release": None}
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        if download and state["feed"] is None:
+            state["release"] = await asyncio.to_thread(download_latest_release)
+        yield
+
     app = FastAPI(title="Patch Sloth", description="A second opinion on CNA-only CVSS scores. Estimates, not "
-                                                   "official scores.")
-    state = {"feed": feed}
+                                                   "official scores.", lifespan=lifespan)
     limit = RateLimiter(rate_limit)
     kw = scan_kwargs or {}
 
@@ -49,7 +59,7 @@ def create_app(feed: Feed | None = None, scan_kwargs: dict | None = None,
     def health():
         f = get_feed()
         return {"status": "ok", "data_as_of": f.data_as_of, "feed_rows": 0 if f.df is None else len(f.df),
-                "model": f.meta.get("model"), "llm_backend": config.LLM_BACKEND}
+                "model": f.meta.get("model"), "feed_release": state["release"], "llm_backend": config.LLM_BACKEND}
 
     @app.post("/scan", dependencies=[Depends(limit)])
     async def scan(request: Request, file: UploadFile | None = File(None), text: str | None = Form(None),
@@ -97,4 +107,4 @@ def create_app(feed: Feed | None = None, scan_kwargs: dict | None = None,
     return app
 
 
-app = create_app()
+app = create_app(download=config.FEED_DOWNLOAD)
