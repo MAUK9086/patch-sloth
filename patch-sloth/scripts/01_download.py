@@ -1,6 +1,7 @@
 """Cross-platform port of 01_download.sh (Windows has no bash by default). Run from repo root. ~150 MB.
 Downloads the NVD yearly feeds (fkie-cad mirror), CISA KEV, the GitHub Advisory DB (sparse clone of
-github-reviewed advisories) and today's EPSS scores, and stamps results/data_as_of.txt."""
+github-reviewed advisories) and today's EPSS scores, and stamps data/data_as_of.txt (the serving data date).
+results/data_as_of.txt is the frozen evaluation snapshot and is not touched here."""
 import datetime as dt
 import shutil
 import subprocess
@@ -45,6 +46,5 @@ try:
 except Exception as e:  # optional, report field only
     print("EPSS download failed (optional):", e)
 
-Path("results").mkdir(exist_ok=True)
-Path("results/data_as_of.txt").write_text(dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%MZ") + "\n")
+Path("data/data_as_of.txt").write_text(dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%MZ") + "\n")
 print("done")

@@ -10,7 +10,7 @@ from .config import MODELS
 from .features import FeatureBuilder
 
 
-def make_model(name: str):
+def make_model(name: str, seed: int = 0):
     if name == "tabpfn":
         # pinned (the package default can change between releases); PATCHSLOTH_TABPFN_VERSION=v2.5 is the fallback
         import os
@@ -18,10 +18,10 @@ def make_model(name: str):
         from tabpfn import TabPFNClassifier
         from tabpfn.constants import ModelVersion
         version = ModelVersion(os.environ.get("PATCHSLOTH_TABPFN_VERSION", "v3.5"))
-        return TabPFNClassifier.create_default_for_version(version, device="cuda", random_state=0)
+        return TabPFNClassifier.create_default_for_version(version, device="cuda", random_state=seed)
     if name == "hgb":
         from sklearn.ensemble import HistGradientBoostingClassifier
-        return HistGradientBoostingClassifier(max_iter=400, learning_rate=0.05, random_state=0)
+        return HistGradientBoostingClassifier(max_iter=400, learning_rate=0.05, random_state=seed)
     if name == "logreg":
         from sklearn.linear_model import LogisticRegression
         from sklearn.pipeline import make_pipeline
@@ -30,8 +30,8 @@ def make_model(name: str):
     raise ValueError(name)
 
 
-def fit(model_name: str, X: pd.DataFrame, y) -> object:
-    clf = make_model(model_name)
+def fit(model_name: str, X: pd.DataFrame, y, seed: int = 0) -> object:
+    clf = make_model(model_name, seed)
     clf.fit(X.fillna(0).values, np.asarray(y).astype(int))
     return clf
 
@@ -77,11 +77,42 @@ def feature_groups(names: list[str]) -> dict[str, list[str]]:
     return groups
 
 
-class BumpModel:
-    """Fitted features + classifier, as used at serve time."""
+BANDS = ("likely", "possible", "unlikely")
 
-    def __init__(self, fb: FeatureBuilder, clf, name: str):
-        self.fb, self.clf, self.name = fb, clf, name
+
+class Bands:
+    """What users see instead of a raw probability. All cut-offs are label-free quantiles of the model's own
+    p_bump over the Deferred population (the CVEs the product scores): likely = top 10% (= tau), possible = next
+    15% (top 25%), unlikely = the rest; tau_high = top 5%. The isotonic map is fitted on the most recent 3 months
+    of val and gives p_bump_cal (monotone, so it never changes the order or the band)."""
+
+    def __init__(self, p_deferred, p_val_recent, y_val_recent, val_window: str = ""):
+        q = np.quantile(np.asarray(p_deferred), [0.75, 0.90, 0.95])
+        self.tau_possible, self.tau, self.tau_high = (float(x) for x in q)
+        from sklearn.isotonic import IsotonicRegression
+        self.iso = IsotonicRegression(out_of_bounds="clip", y_min=0, y_max=1).fit(
+            np.asarray(p_val_recent), np.asarray(y_val_recent).astype(int))
+        self.n_deferred, self.val_window = len(p_deferred), val_window
+
+    def band(self, p) -> np.ndarray:
+        p = np.asarray(p, dtype=float)
+        return np.where(p >= self.tau, "likely", np.where(p >= self.tau_possible, "possible", "unlikely"))
+
+    def calibrate(self, p) -> np.ndarray:
+        return self.iso.predict(np.asarray(p, dtype=float))
+
+    def as_dict(self) -> dict:
+        return dict(tau=self.tau, tau_high=self.tau_high, tau_possible=self.tau_possible,
+                    rule="label-free quantiles of p_bump over deferred_unlabeled: likely >= q90 (tau), "
+                         "possible >= q75, tau_high = q95", n_deferred=self.n_deferred,
+                    isotonic_fit_on=self.val_window)
+
+
+class BumpModel:
+    """Fitted features + classifier, as used at serve time (plus its Bands, when built by scripts/15)."""
+
+    def __init__(self, fb: FeatureBuilder, clf, name: str, bands: Bands | None = None):
+        self.fb, self.clf, self.name, self.bands = fb, clf, name, bands
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         return predict_proba(self.clf, self.fb.transform(df))

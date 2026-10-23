@@ -2,10 +2,13 @@
 serve path uses for every scanned CVE.
 
 feed/second_opinion.parquet  one row per CVE in the dataset:
-  source = "model"  Deferred / Awaiting Analysis / Received with a CNA vector: p_bump + predicted_vector
+  source = "model"  Deferred / Awaiting Analysis / Received with a CNA vector: p_bump + predicted_vector, plus
+                    bump_band (likely / possible / unlikely: what users see), p_bump_cal (isotonic) and bump_high
   source = "nvd"    NVD analysed it: predicted_vector = the NVD-final vector (label rule), no p_bump
   source = "none"   no CNA v3.1 vector to second-guess
-feed/latest.csv              the open data feed: source == "model" rows only, without descriptions
+feed/latest.csv              the open data feed: source == "model" rows only, without descriptions; it carries
+                             the band and the calibrated probability, not the raw score
+CVEs missing from the feed are scored on demand by the CPU fallback model (HGB), never by the GPU feed model.
 """
 import json
 import urllib.request
@@ -27,7 +30,8 @@ META_FILE = config.FEED / "meta.json"
 NVD_API = "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId={}"
 COLUMNS = ["cve", "published", "status", "cna", "cna_cwe", "score_source", "description", "cna_vector",
            "predicted_vector", "p_bump", "source", "llm_backend", "epss", "kev_date", "n_refs", "ref_github",
-           "ref_exploitdb", "has_v40"]
+           "ref_exploitdb", "has_v40", "p_bump_cal", "bump_band", "bump_high", "bump_model"]
+BAND_COLUMNS = ["p_bump_cal", "bump_band", "bump_high", "bump_model"]
 
 
 def _sev(v):
@@ -48,14 +52,24 @@ def score_rows(df: pd.DataFrame, model: BumpModel | None, backend=None) -> pd.Da
         u = df[unanalysed]
         df.loc[unanalysed, "predicted_vector"] = backend.predict_vectors(list(u.itertuples()))
         if model is not None:
-            df.loc[unanalysed, "p_bump"] = model.predict(u)
+            p = model.predict(u)
+            df.loc[unanalysed, "p_bump"] = p
+            df.loc[unanalysed, "bump_model"] = model.name
+            bands = getattr(model, "bands", None)  # models saved before scripts/15 have none
+            if bands is not None:
+                df.loc[unanalysed, "p_bump_cal"] = bands.calibrate(p)
+                df.loc[unanalysed, "bump_band"] = bands.band(p)
+                df.loc[unanalysed, "bump_high"] = p >= bands.tau_high
         df.loc[unanalysed, "source"] = "model"
+    for c in BAND_COLUMNS:
+        if c not in df:
+            df[c] = None
     df["llm_backend"] = np.where(df.source == "model", backend.name, None)
     return df
 
 
 def build(since: str | None = None, model_name: str = "hgb", no_llm: bool = True,
-          dataset: Path = config.CVES_PARQUET, out_dir: Path = config.FEED) -> dict:
+          dataset: Path = config.CVES_PARQUET, out_dir: Path = config.FEED, fallback_model: str = "hgb") -> dict:
     """Score the dataset and write the feed. `since` limits the CSV to CVEs published on/after a date."""
     df = pd.read_parquet(dataset)
     model = BumpModel.load(name=model_name)
@@ -71,12 +85,16 @@ def build(since: str | None = None, model_name: str = "hgb", no_llm: bool = True
         pub = pub[pub.published >= since]
     pub = pub.assign(cna_severity=pub.cna_vector.map(_sev), predicted_severity=pub.predicted_vector.map(_sev))
     pub = pub.sort_values("p_bump", ascending=False)
+    pub = pub.rename(columns={"p_bump_cal": "p_bump_calibrated"})
     pub[["cve", "published", "status", "cna", "cna_vector", "cna_severity", "predicted_vector",
-         "predicted_severity", "p_bump", "llm_backend", "epss", "kev_date"]] \
+         "predicted_severity", "bump_band", "p_bump_calibrated", "bump_model", "llm_backend", "epss", "kev_date"]] \
         .to_csv(out_dir / CSV_FILE.name, index=False, float_format="%.4f")
-    as_of = (config.RESULTS / "data_as_of.txt")
+    # serving data date (scripts/01 stamps it); results/data_as_of.txt is the frozen evaluation snapshot
+    as_of = config.DATA / "data_as_of.txt"
+    fb = BumpModel.load(name=fallback_model)
     meta = dict(data_as_of=as_of.read_text().strip() if as_of.exists() else None, epss_date=score_date,
-                model=model_name, llm_backend=backend.name, thresholds=config.thresholds(),
+                model=model_name, fallback_model=fallback_model, llm_backend=backend.name,
+                bands={m.name: m.bands.as_dict() for m in (model, fb) if getattr(m, "bands", None) is not None},
                 n_rows=len(df), n_model=int((df.source == "model").sum()), n_csv=len(pub))
     (out_dir / META_FILE.name).write_text(json.dumps(meta, indent=1, default=float))
     return meta
@@ -99,7 +117,8 @@ class Feed:
     def model(self) -> BumpModel | None:
         if self._model is None:
             try:
-                self._model = BumpModel.load(name=self.meta.get("model", "hgb"))
+                # on-demand rows use the CPU fallback (the feed model may need a GPU)
+                self._model = BumpModel.load(name=self.meta.get("fallback_model", "hgb"))
             except FileNotFoundError:
                 return None
         return self._model

@@ -2,7 +2,8 @@
 Features are all available at serve time for Deferred CVEs (patchsloth/features.py). Optionally stacks
 the fine-tuned LLM's predicted vector as features (--with_llm). Compares TabPFN vs logistic regression vs HistGBT.
 Usage: python scripts/07_tabpfn_bump.py --model tabpfn --n_train 10000 [--with_llm]
-With --model hgb it also saves data/models/bump_hgb.joblib (serve-time fallback) and results/thresholds.json."""
+NOTE: --n_train defaults to 10000, for HGB too (the M1/SPEC "HistGBT 0.58" bar is a 10k model). Serve-time models
+are built by scripts/15_serving_model.py."""
 import argparse
 import json
 import os
@@ -36,6 +37,9 @@ if a.with_llm:  # out-of-SFT LLM predictions only (stack_train for training rows
         print("NOTE: --with_llm needs results/llm_vectors_ft_stack_train.json (out-of-SFT train predictions)")
 
 fb = FeatureBuilder(with_llm=a.with_llm).fit(df[df.split == "train"])
+# with LLM features, only rows with an out-of-SFT LLM prediction are scored: elsewhere the LLM features would be
+# missing and read as "LLM agreed with the CNA". Deferred CVEs have no LLM prediction yet, so no tau either.
+has_llm = df[LLM_INPUT].notna().to_numpy() if a.with_llm else np.ones(len(df), bool)
 X = fb.transform(df)
 y = df.bump_up
 tr = df.split == "train"
@@ -62,14 +66,14 @@ def at(yy, p, t):
 
 # tau: top 10% of the population the product actually scores (Deferred, no labels), the same cutoff
 # serve time applies. No test (or val) labels are used to choose it.
-m_def = (df.split == "deferred_unlabeled").to_numpy()
-p_def = predict(m_def)
-tau = float(np.quantile(p_def, 0.90))
+m_def = (df.split == "deferred_unlabeled").to_numpy() & has_llm
+p_def = predict(m_def) if m_def.any() else np.zeros(0)
+tau = float(np.quantile(p_def, 0.90)) if len(p_def) else None
 out = {}
 rng = np.random.default_rng(0)
 preds = {}
 for split in ["val", "test"]:
-    m = (df.split == split).to_numpy()
+    m = (df.split == split).to_numpy() & has_llm
     p = predict(m)
     yy = y[m].astype(int).to_numpy()
     k = max(1, int(0.1 * len(p)))
@@ -85,13 +89,14 @@ for split in ["val", "test"]:
         pub = df.published[m].to_numpy()
         recent = pub >= str((pd.Timestamp(df.published[m].max()) - pd.DateOffset(months=3)).date())
         tau_val = tabular.choose_tau(yy[recent], p[recent], min_precision=0.5)
-        tau_high = max(tau, tabular.choose_tau(yy[recent], p[recent], min_precision=0.75))
+        tau_high = max(tau or 0.0, tabular.choose_tau(yy[recent], p[recent], min_precision=0.75))
         thr = dict(tau=tau, tau_rule=f"90th percentile of p_bump over deferred_unlabeled (n={int(m_def.sum())}); "
                                      "no labels", tau_high=tau_high,
                    tau_high_rule=f"val published >= {pub[recent].min()}: largest flag set with precision >= 0.75, "
                                  "floored at tau", model=tag, n_tune=int(recent.sum()),
                    base_rate_tune=float(yy[recent].mean()))
-    out[split].update(at_tau=at(yy, p, tau), at_tau_high=at(yy, p, tau_high), at_tau_val=at(yy, p, tau_val))
+    out[split].update(at_tau=at(yy, p, tau) if tau is not None else None, at_tau_high=at(yy, p, tau_high),
+                      at_tau_val=at(yy, p, tau_val))
     preds[split] = pd.DataFrame({"cve": df.cve[m].to_numpy(), "published": df.published[m].to_numpy(),
                                  "y": yy, "p": p})
     print(split, {k_: (np.round(v_, 3) if isinstance(v_, float) else v_) for k_, v_ in out[split].items()})
@@ -104,15 +109,14 @@ out["drift_finding"] = dict(
 print("thresholds", thr)
 print("drift", out["drift_finding"])
 # score the real target population: Deferred CVEs nobody independently checked
-pd.DataFrame({"cve": df.cve[m_def], "cna": df.cna[m_def], "cna_vector": df.cna_vector[m_def], "p_bump": p_def}) \
-  .sort_values("p_bump", ascending=False).to_csv(f"results/deferred_scored_{tag}.csv", index=False)
+if m_def.any():
+  pd.DataFrame({"cve": df.cve[m_def], "cna": df.cna[m_def], "cna_vector": df.cna_vector[m_def], "p_bump": p_def}) \
+    .sort_values("p_bump", ascending=False).to_csv(f"results/deferred_scored_{tag}.csv", index=False)
 out["model"] = dict(name=a.model, n_train=len(idx), n_features=X.shape[1],
                     tabpfn_version=os.environ.get("PATCHSLOTH_TABPFN_VERSION", "v3.5") if a.model == "tabpfn" else None)
 json.dump(out, open(f"results/bump_{tag}.json", "w"), indent=1, default=float)
 # per-row val/test predictions for the calibration and scaling plots (scripts/11_tabpfn_plots.py)
 Path("data/preds").mkdir(parents=True, exist_ok=True)
 pd.concat([d.assign(split=k) for k, d in preds.items()]).to_parquet(f"data/preds/bump_{tag}.parquet", index=False)
-if a.model == "hgb" and not a.with_llm:  # the CPU serve-time fallback
-    print("saved", tabular.BumpModel(fb, clf, "hgb").save())
-    Path("results/thresholds.json").write_text(json.dumps(thr, indent=1))
+if a.model == "hgb" and not a.with_llm:  # serve-time models (with Bands) are built by scripts/15_serving_model.py
     Path("results/tau_drift.json").write_text(json.dumps(out["drift_finding"], indent=1, default=float))

@@ -1,7 +1,7 @@
 """M2 evidence for Task B: TabPFN scaling curve and calibration (SPEC §9.2, §10).
 Reads results/bump_tabpfn_n*.json and the per-row predictions 07 saves in data/preds/. HGB and logistic regression
 are refitted here on the same n_train subsamples (same sampling as 07), so the curves compare like with like.
-Calibration: Brier + reliability on test; isotonic fitted on the first half of val (by publication date) and
+Calibration (TabPFN at the largest n vs the 10k HGB from 07): Brier + reliability on test; isotonic fitted on the first half of val (by publication date) and
 reported on the second half of val and on test.
 Usage: python scripts/11_tabpfn_plots.py   (after 07 --model hgb and 07 --model tabpfn at each n_train)
 Writes results/tabpfn_scaling.{json,png} and results/tabpfn_calibration.{json,png}."""
@@ -25,7 +25,8 @@ from patchsloth import tabular  # noqa: E402
 from patchsloth.features import FeatureBuilder  # noqa: E402
 
 R = Path("results")
-as_of = (R / "data_as_of.txt").read_text().strip()
+# M2 ran on the serving data (all test rows), not on the frozen evaluation snapshot in results/data_as_of.txt
+as_of = Path("data/data_as_of.txt").read_text().strip()
 
 
 def pr_auc_ci(y, p, n_boot=500):
@@ -58,10 +59,12 @@ for n, f in runs:
             row[s] = dict(pr_auc=v, pr_auc_ci95=ci)
         scaling[name].append(row)
     print("n", n, {k: round(scaling[k][-1]["test"]["pr_auc"], 3) for k in ["tabpfn", "hgb", "logreg"]})
-full_hgb = json.loads((R / "bump_hgb.json").read_text())
-scaling["hgb_full_train"] = dict(n_train=int(tr.sum()), test=dict(pr_auc=full_hgb["test"]["pr_auc"],
-                                                                   pr_auc_ci95=full_hgb["test"]["pr_auc_ci95"]))
-scaling["test_base_rate"] = float(full_hgb["test"]["base_rate"])
+# HGB on ALL train rows (results/bump_hgb.json is a 10k model: 07's default --n_train)
+clf = tabular.fit("hgb", X[tr], y[tr])
+m_t = (df.split == "test").to_numpy()
+v, ci = pr_auc_ci(y[m_t].astype(int).to_numpy(), tabular.predict_proba(clf, X[m_t]))
+scaling["hgb_full_train"] = dict(n_train=int(tr.sum()), test=dict(pr_auc=v, pr_auc_ci95=ci))
+scaling["test_base_rate"] = float(y[m_t].mean())
 (R / "tabpfn_scaling.json").write_text(json.dumps(scaling, indent=1))
 
 fig, ax = plt.subplots(figsize=(6.4, 4.2))
@@ -93,7 +96,7 @@ fig.savefig(R / "tabpfn_scaling.png", dpi=150)
 n_max = runs[-1][0]
 cal = {"data_as_of": as_of}
 fig, axes = plt.subplots(1, 2, figsize=(10, 4.2))
-for tag, label, c in [(f"tabpfn_n{n_max}", f"TabPFN-3.5 (n={n_max:,})", "C0"), ("hgb", "HistGBT (all train)", "C1")]:
+for tag, label, c in [(f"tabpfn_n{n_max}", f"TabPFN-3.5 (n={n_max:,})", "C0"), ("hgb", "HistGBT (n=10,000)", "C1")]:
     p_path = Path(f"data/preds/bump_{tag}.parquet")
     if not p_path.exists():
         print("skip calibration for", tag, "(no", p_path, ")")

@@ -1,0 +1,80 @@
+{
+ "val": {
+  "n": 8000,
+  "base_rate": 0.226,
+  "pr_auc": 0.9247479147744486,
+  "pr_auc_ci95": [
+   0.915981124058369,
+   0.9336660313437257
+  ],
+  "roc_auc": 0.9708524309128537,
+  "brier": 0.05360287427902222,
+  "precision_at_top10pct": 0.9875,
+  "at_tau": null,
+  "at_tau_high": {
+   "threshold": 0.47829896211624146,
+   "flag_rate": 0.2345,
+   "precision": 0.8214285714285714,
+   "recall": 0.8523230088495575
+  },
+  "at_tau_val": {
+   "threshold": 0.09796793013811111,
+   "flag_rate": 0.3815,
+   "precision": 0.5717562254259502,
+   "recall": 0.9651548672566371
+  }
+ },
+ "test": {
+  "n": 8000,
+  "base_rate": 0.09475,
+  "pr_auc": 0.6204500380873518,
+  "pr_auc_ci95": [
+   0.5855760701557339,
+   0.6535190809296655
+  ],
+  "roc_auc": 0.9014887868261876,
+  "brier": 0.06017809361219406,
+  "precision_at_top10pct": 0.55125,
+  "at_tau": null,
+  "at_tau_high": {
+   "threshold": 0.47829896211624146,
+   "flag_rate": 0.097125,
+   "precision": 0.5611325611325612,
+   "recall": 0.575197889182058
+  },
+  "at_tau_val": {
+   "threshold": 0.09796793013811111,
+   "flag_rate": 0.2925,
+   "precision": 0.2782051282051282,
+   "recall": 0.8588390501319261
+  }
+ },
+ "thresholds": {
+  "tau": null,
+  "tau_rule": "90th percentile of p_bump over deferred_unlabeled (n=0); no labels",
+  "tau_high": 0.47829896211624146,
+  "tau_high_rule": "val published >= 2025-09-30: largest flag set with precision >= 0.75, floored at tau",
+  "model": "tabpfn_llm_n10000",
+  "n_tune": 3878,
+  "base_rate_tune": 0.18592057761732853
+ },
+ "drift_finding": {
+  "tau_val": 0.09796793013811111,
+  "rule": "SPEC \u00a79.2 literal: precision >= 0.5 on the last 3 months of val",
+  "val_recent_base_rate": 0.18592057761732853,
+  "test_base_rate": 0.09475,
+  "test_at_tau_val": {
+   "threshold": 0.09796793013811111,
+   "flag_rate": 0.2925,
+   "precision": 0.2782051282051282,
+   "recall": 0.8588390501319261
+  },
+  "note": "val-tuned threshold transfers badly to 2026: the bump base rate halved, so precision at tau_val drops"
+ },
+ "model": {
+  "name": "tabpfn",
+  "n_train": 10000,
+  "n_features": 58,
+  "tabpfn_version": "v3.5"
+ }
+}

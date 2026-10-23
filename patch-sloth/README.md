@@ -18,11 +18,19 @@ pip install -r requirements.txt && pip install -e .     # GPU box: also requirem
 python scripts/01_download.py        # or: bash scripts/01_download.sh
 python scripts/02_build_dataset.py
 python scripts/03_baselines.py
-python scripts/07_tabpfn_bump.py --model hgb      # or --model tabpfn (GPU)
+python scripts/07_tabpfn_bump.py --model hgb      # or --model tabpfn (GPU); note --n_train defaults to 10k
+python scripts/15_serving_model.py --model hgb    # CPU fallback model with its bands (all train rows)
 patchsloth feed build                # HGB-only second-opinion feed -> feed/
 pytest -q
 ```
-The M1 numbers are in `results/m1_reproduction.md`. Decisions and their reasons are in `DECISIONS.md`.
+GPU box (M2/M4): `07 --model tabpfn --n_train N`, `11_tabpfn_plots.py`, `12_m4_experiments.py` (all Task-B configs × 3
+seeds), `13_final_table.py` (paired bootstrap), `14_frontier_1k_and_gate.py` (Ultramarine 1k rows, gated override),
+`15_serving_model.py --model tabpfn` then `patchsloth feed build --model tabpfn`.
+
+Two dates: `results/data_as_of.txt` is the frozen **evaluation** snapshot (the rows the LLM was scored on);
+`data/data_as_of.txt` is the **serving** data date that `01` stamps and the feed reports.
+The M1 numbers are in `results/m1_reproduction.md`, the final comparison in `results/final_table.md`. Decisions and
+their reasons are in `DECISIONS.md`.
 
 ## Use
 ```

@@ -10,11 +10,12 @@ def lookup_rows(cves: dict[str, dict], feed: Feed, fetch_missing: bool = False, 
         rec = feed.get(cve) or (feed.on_demand(cve, backend) if fetch_missing else None)
         if rec is None:
             rows.append(dict(cve=cve, **pkg, source="not-in-feed", cna_vector=None, predicted_vector=None,
-                             p_bump=None, epss=None, kev_date=None))
+                             p_bump=None, bump_band=None, bump_high=None, epss=None, kev_date=None))
             continue
         rows.append(dict(cve=cve, **pkg, source=rec.get("source"), status=rec.get("status"),
                          cna_vector=rec.get("cna_vector"), predicted_vector=rec.get("predicted_vector"),
-                         p_bump=rec.get("p_bump"), epss=rec.get("epss"), kev_date=rec.get("kev_date")))
+                         p_bump=rec.get("p_bump"), bump_band=rec.get("bump_band"), bump_high=rec.get("bump_high"),
+                         epss=rec.get("epss"), kev_date=rec.get("kev_date")))
     return rows
 
 
@@ -24,8 +25,10 @@ def cve_opinion(cve_id: str, feed: Feed | None = None, fetch_missing: bool = Tru
     rec = feed.get(cve_id) or (feed.on_demand(cve_id, backend) if fetch_missing else None)
     if rec is None:
         return None
-    row = priority.prioritise({k: rec.get(k) for k in ("cve", "cna_vector", "predicted_vector", "p_bump", "epss",
-                                                        "kev_date")} | {"fixed": None})
+    row = priority.prioritise({k: rec.get(k) for k in ("cve", "cna_vector", "predicted_vector", "p_bump", "bump_band",
+                                                        "bump_high", "epss", "kev_date", "source")} | {"fixed": None})
+    if row.get("bump_band"):  # users see the band, not the raw probability
+        row.pop("p_bump", None)
     return {**row, "status": rec.get("status"), "cna": rec.get("cna"), "source": rec.get("source"),
             "description": rec.get("description"), "data_as_of": feed.data_as_of,
             "note": "estimate for triage, not an official score"}

@@ -132,7 +132,7 @@ def build_index(advisory_dir: Path = config.ADVISORY_DB, out: Path = INDEX_FILE)
     """Compact {ecosystem:name -> [advisory]} index of npm/PyPI advisories that have a CVE alias."""
     idx: dict[str, list] = {}
     skipped = []
-    for f in Path(advisory_dir).rglob("GHSA-*.json"):
+    for f in sorted(Path(advisory_dir).rglob("GHSA-*.json")):  # sorted: rglob order differs by OS/filesystem
         try:
             a = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):

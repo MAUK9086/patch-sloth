@@ -81,3 +81,16 @@ def test_sort_order():
     rows = [dict(cve="a", cna_vector=LOW, p_bump=0.0), dict(cve="b", cna_vector=MED, kev_date="2026-01-01"),
             dict(cve="c", cna_vector=HIGH, p_bump=0.1)]
     assert [r["cve"] for r in prioritise_all(rows, tau=0.3, tau_high=0.7)] == ["b", "c", "a"]
+
+
+def test_band_overrides_raw_threshold():
+    # rows from a model with Bands are judged on that model's own cut-offs, and no probability is shown
+    r = p(predicted_vector=HIGH, p_bump=0.05, bump_band="likely", bump_high=True, fixed="1.0.0")
+    assert r["bucket"] == "P0" and "likely under-rated: CNA MEDIUM -> predicted HIGH" in r["reason"]
+    assert not any("p=" in x for x in r["reason"])
+    r = p(predicted_vector=HIGH, p_bump=0.95, bump_band="possible", bump_high=False, fixed="1.0.0")
+    assert r["bucket"] == "P2" and "CNA MEDIUM; a higher rating is possible" in r["reason"]
+
+
+def test_likely_without_high_is_p1():
+    assert p(predicted_vector=HIGH, bump_band="likely", bump_high=False, fixed="1.0.0")["bucket"] == "P1"

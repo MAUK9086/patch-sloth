@@ -82,9 +82,12 @@ def test_fixture_lockfiles_fallback(index, name):
     res = scan.scan_text((FIX / name).read_text(), name, engine="fallback", index=index)
     assert res["engine"] == "ghsa-fallback"
     assert sorted({c for f in res["findings"] for c in f["cves"]}) == sorted(EXPECTED[name]["cves"])
-    fixed = {f["package"]: f["fixed"] for f in res["findings"]}
+    # a package can match several advisories, each with its own fix: compare sets, not "last finding wins"
+    fixed: dict[str, set] = {}
+    for f in res["findings"]:
+        fixed.setdefault(f["package"], set()).add(f["fixed"])
     for pkg, fx in EXPECTED[name]["fixed"].items():
-        assert fixed[pkg] == fx
+        assert fx in fixed[pkg]
 
 
 def test_fixtures_include_a_deferred_cve():

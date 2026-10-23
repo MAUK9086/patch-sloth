@@ -1,0 +1,64 @@
+{
+ "model": "tabpfn",
+ "n_train": 50000,
+ "data_note": "trained/scored on the serving data (data/data_as_of.txt)",
+ "tau": 0.7223636567592622,
+ "tau_high": 0.8472653090953826,
+ "tau_possible": 0.34972378611564636,
+ "rule": "label-free quantiles of p_bump over deferred_unlabeled: likely >= q90 (tau), possible >= q75, tau_high = q95",
+ "n_deferred": 49272,
+ "isotonic_fit_on": "val published >= 2025-09-30 (n=5613)",
+ "deferred_band_share": {
+  "likely": 0.10001623640201332,
+  "possible": 0.14998376359798668,
+  "unlikely": 0.75
+ },
+ "test_all": {
+  "n": 31198,
+  "base_rate": 0.09183280979549971,
+  "bands": {
+   "likely": {
+    "share": 0.04298352458490929,
+    "observed_bump_rate": 0.7516778523489933,
+    "n": 1341
+   },
+   "possible": {
+    "share": 0.08712096929290339,
+    "observed_bump_rate": 0.3671817512877116,
+    "n": 2718
+   },
+   "unlikely": {
+    "share": 0.8698955061221874,
+    "observed_bump_rate": 0.03165186631784517,
+    "n": 27139
+   }
+  },
+  "at_tau_high": {
+   "flag_rate": 0.02295018911468684,
+   "precision": 0.88268156424581,
+   "recall": 0.2205933682373473
+  },
+  "brier_raw": 0.055156461894512177,
+  "brier_calibrated": 0.05191387981176376
+ },
+ "test_eval_rows": {
+  "n": 8000,
+  "bands": {
+   "likely": {
+    "share": 0.040875,
+    "observed_bump_rate": 0.7767584097859327,
+    "n": 327
+   },
+   "possible": {
+    "share": 0.092375,
+    "observed_bump_rate": 0.3491204330175913,
+    "n": 739
+   },
+   "unlikely": {
+    "share": 0.86675,
+    "observed_bump_rate": 0.03547735794635131,
+    "n": 6934
+   }
+  }
+ }
+}

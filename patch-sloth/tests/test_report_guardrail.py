@@ -105,3 +105,13 @@ def test_no_key_uses_template(monkeypatch):
     monkeypatch.setattr(report.config, "PAPERINSTRUMENTS_API_KEY", "")
     out = report.write_report(payload())
     assert out["writer"] == "template" and out["usd"] == 0.0
+
+
+def test_band_replaces_probability_in_payload():
+    from patchsloth.priority import prioritise
+    row = prioritise(dict(cve="CVE-2026-0002", package="x", version="1.0.0", fixed=None, cna_vector=MED,
+                          predicted_vector=HIGH, p_bump=0.8213, bump_band="likely", bump_high=False, epss=None,
+                          kev_date=None, source="model"))
+    r = report.build_payload([row])["rows"][0]
+    assert r["bump_band"] == "likely" and r["p_bump"] is None
+    assert "0.82" not in report.template_report(report.build_payload([row]))
