@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "toolu_015urB2wAN4HAnuuoNsEe3AR",
+  "agent_id": "a1a17e9881a0c0a35",
+  "subagent_type": "web-fetch",
+  "task_description": "Fetch DO pricing and app spec",
+  "files": [
+    "patch-sloth/results/costs.jsonl"
+  ],
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 46146,
+    "cache_read_tokens": 43542,
+    "output_tokens": 834,
+    "api_call_count": 3
+  },
+  "started_at": "2026-10-24T01:15:24.0749524+05:30",
+  "completed_at": "2026-10-24T01:15:24.0766879+05:30"
+}
