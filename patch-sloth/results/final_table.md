@@ -157,7 +157,7 @@ LLM predictions, n = 3,878).
 - Feed: 58,457 unanalysed CVEs (Deferred 49,272, Awaiting Analysis 6,604, Received 1,902, Undergoing Analysis 679),
   all scored by the stack. Bands: likely 5,179, possible 8,105, unlikely 45,173. Isotonic maps the top 102 rows to
   1.0; the band is the honest summary (observed ~0.75 in "likely" on 2026).
-- TabPFN-only (`serving_tabpfn.json`; τ 0.722, τ_high 0.847, likely 254/327 = 0.777) and HGB fallback (τ 0.703,
+- TabPFN-only component (`serving_tabpfn.json`; τ 0.722, τ_high 0.847; "likely" band in §8) and HGB fallback (τ 0.703,
   τ_high 0.845) numbers are unchanged.
 - **Distribution:** `feed/` is gitignored. The feed (`second_opinion.parquet`, `latest.csv`, `meta.json`) and the HGB
   fallback model (`bump_hgb.joblib`) are assets of the GitHub release `feed-2026-10-23`. At start-up the API
@@ -166,13 +166,12 @@ LLM predictions, n = 3,878).
 
 ## 7. Headline claims (approved wording, 2026-10-23)
 
-> "When Patch Sloth said 'likely under-rated', NIST had raised the score 78% of the time (254/327) vs a 9.5% base
+> "When Patch Sloth said 'likely under-rated', NIST had raised the score 75% of the time (281/376) vs a 9.5% base
 > rate."
 
-Source: TabPFN-3.5 (tabular, 50k) "likely" band (label-free cut-off: top 10% of Deferred scores) on the 8,000 2026
-evaluation test rows (`results/serving_tabpfn.json`, `test_eval_rows`). It flags 4.1% of those rows.
-**Note:** the served model is now the stack (§6). Its "likely" band is confirmed 281/376 = 75% on the same rows.
-The approved wording quotes the TabPFN-only model; [HUMAN] keep it, or switch it to the served stack's number.
+Source: the served combined model's (stack, §6) "likely" band (label-free cut-off: top 10% of Deferred scores) on
+the 8,000 2026 evaluation test rows (`results/serving_stack.json`, `test_eval_rows`). It flags 4.7% of those rows.
+The TabPFN-only component's figure is in §8.
 
 > Gated override: with a threshold tuned on all of 2025-H2, letting the LLM rewrite CNA vectors is **worse** than
 > copying the CNA on 2026 (−2.1 points). Tuned on the most recent 3 months, it is **better**: +2.0 points
@@ -207,6 +206,9 @@ What the post can say:
 - **TabPFN on 5k rows gets 96% of the way to HGB on 80k rows** (0.602 vs 0.627), with 1/16 of the labelled data and
   no tuning. It is not *equal*: the gap is significant in 2 of 3 seeds. From 30k rows on, the two are level.
 - With all the data, HGB catches up. TabPFN is not more accurate here; it gets there with far fewer labels.
+- **TabPFN-only component** (50k, tabular features; the fallback for unanalysed CVEs without an LLM vector): its
+  "likely" band is confirmed 78% of the time (254/327) on the same 8,000 2026 eval rows, vs a 9.5% base rate
+  (`results/serving_tabpfn.json`). The headline (§7) uses the served combined model's 75% (281/376).
 
 ## 9. What went wrong
 
@@ -223,11 +225,13 @@ disappears (§2). The project's TabPFN story became sample efficiency (§8), not
 `15`, which has no subsample default; every M4 config states its training rows.
 
 **2. The NaN label bug (scaffold, before this repo's sessions).** The label rule (SPEC §8.2: NVD's vector if NVD wrote
-one, else the CNA's) was first written with truthiness checks (`if nvd_vector:`). In pandas, a missing value is a
-float NaN, and NaN is truthy, so missing NVD vectors were taken as present. That silently mislabelled about 40% of
-rows.
-*How it was caught:* not recorded in this repo. It was found and fixed in the chat session that produced the
-scaffold, before Entire was enabled; SPEC §8.2 only notes that it happened. **[HUMAN]: add how you spotted it.**
+one, else the CNA's) was first written with truthiness checks (`nvd_vector or cna_vector`). pandas stores missing
+strings as NaN, which is truthy, so for rows NVD had accepted unchanged (no NVD-written score) the rule returned NaN
+and those rows silently lost their labels. The labelled set was 115,092 rows, every one of them a row where NVD wrote
+its own score: a biased sample of mostly disagreements. After the fix it is 122,459 rows.
+*How it was caught:* on 2026-10-21, during the first dataset build, in a separate chat session before Entire was
+enabled. The sanity check showed 100% of labelled rows had an NVD-written score, contradicting the earlier profiling
+(roughly half had none), and the 2026 "vector changed" rate came out at 93% instead of the expected ~20%.
 *Fix:* `label_vector` uses `isinstance(x, str)` and lives in `patchsloth/data/nvd.py` as a pure function.
 `tests/test_label_rule.py` checks that None, NaN, `np.nan` and `pd.NA` never produce a label, both directly and
 through a DataFrame, because pandas 3.0 turns missing strings into NaN.
