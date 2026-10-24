@@ -1,5 +1,5 @@
 """scan -> feed lookup (or on-demand second opinion) -> priority rules -> report. Shared by CLI and API."""
-from . import priority, report, scan
+from . import config, priority, report, scan
 from .feed import Feed
 
 
@@ -35,11 +35,11 @@ def cve_opinion(cve_id: str, feed: Feed | None = None, fetch_missing: bool = Tru
 
 
 def run(text: str, filename: str, feed: Feed | None = None, *, write: bool = True, use_llm: bool | None = None,
-        fetch_missing: bool = False, engine: str = "auto", index: dict | None = None, backend=None,
+        fetch_missing: bool = False, engine: str | None = None, index: dict | None = None, backend=None,
         report_tools=None) -> dict:
     """Full pipeline on lockfile content. Returns {rows, report_md, costs, data_as_of, engine, n_deps}."""
     feed = feed or Feed()
-    sc = scan.scan_text(text, filename, engine=engine, index=index)
+    sc = scan.scan_text(text, filename, engine=engine or config.SCAN_ENGINE, index=index)
     rows = lookup_rows(scan.cves_by_package(sc["findings"]), feed, fetch_missing, backend)
     ranked = priority.prioritise_all(rows)
     for r in ranked:

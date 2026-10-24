@@ -6,6 +6,9 @@
   compare  send 300 random 2026 test CVEs (seed 0) to the vLLM server and compare with Tinker's outputs for the same
            CVEs (results/llm_preds_ft_test.jsonl, greedy, max_tokens 48). Writes results/vllm_parity.json.
              python scripts/12_vllm_parity.py compare --base_url http://<droplet>:8000/v1   (VLLM_API_KEY in env)
+  latency  100 single-CVE second opinions, one at a time, through the app's VLLMBackend (chat mode): p50/p95
+           end-to-end seconds. Writes results/vllm_latency.json.
+             python scripts/12_vllm_parity.py latency --base_url http://127.0.0.1:8000/v1 [--n 100]
 
 Two request modes are compared (each on the same 300 rows):
   tokens  /v1/completions with the exact prompt token IDs from Tinker's renderer (qwen3_disable_thinking) and
@@ -30,11 +33,11 @@ from patchsloth.cvss import base_score, parse, severity  # noqa: E402
 from patchsloth.llm.prompt import messages, parse_output  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("step", choices=["export", "compare"])
+ap.add_argument("step", choices=["export", "compare", "latency"])
 ap.add_argument("--model_path", default=None, help="tinker://... sampler weights (default: results/tinker_run.json)")
 ap.add_argument("--out", default="peft_adapter")
 ap.add_argument("--base_url", default=config.VLLM_BASE_URL)
-ap.add_argument("--n", type=int, default=300)
+ap.add_argument("--n", type=int, default=None, help="rows: 300 for compare, 100 for latency")
 ap.add_argument("--concurrency", type=int, default=16)
 ap.add_argument("--modes", default="tokens,chat")
 a = ap.parse_args()
@@ -51,6 +54,41 @@ if a.step == "export":
     cfg = json.loads((Path(a.out) / "adapter_config.json").read_text())
     print(f"PEFT adapter in {a.out}: rank r={cfg.get('r')} (vllm serve needs --max-lora-rank >= r), "
           f"alpha={cfg.get('lora_alpha')}, targets={cfg.get('target_modules')}")
+    sys.exit(0)
+
+# ------------------------------------------------------------------ latency (the app's request path)
+if a.step == "latency":
+    import platform
+    import subprocess
+
+    from patchsloth.llm.backends import VLLMBackend
+    if not a.base_url:
+        sys.exit("set --base_url or VLLM_BASE_URL")
+    be = VLLMBackend(base_url=a.base_url, concurrency=1)
+    d = pd.read_parquet(config.CVES_PARQUET)
+    n = a.n or 100
+    d = d[(d.split == "test") & d.cna_vector.notna()].sample(n + 5, random_state=1)
+    d["description"] = d.description.fillna("")
+    rows = list(d.itertuples())
+    for r in rows[:5]:  # warm-up, not timed
+        be.predict_vectors([r])
+    lat = []
+    for r in rows[5:]:
+        t0 = time.perf_counter()
+        be.predict_vectors([r])
+        lat.append(time.perf_counter() - t0)
+    lat = np.array(lat)
+    try:
+        gpu = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], capture_output=True,
+                             text=True).stdout.strip()
+    except OSError:
+        gpu = None
+    out = dict(n=len(lat), mode="VLLMBackend chat, 1 request at a time, after 5 warm-up requests",
+               p50_s=float(np.percentile(lat, 50)), p95_s=float(np.percentile(lat, 95)), mean_s=float(lat.mean()),
+               max_s=float(lat.max()), client_host=platform.node(), gpu=gpu,
+               measured_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    (R / "vllm_latency.json").write_text(json.dumps(out, indent=1))
+    print(json.dumps(out, indent=1))
     sys.exit(0)
 
 # ------------------------------------------------------------------ compare
@@ -72,7 +110,7 @@ for line in open(R / "llm_preds_ft_test.jsonl", encoding="utf-8"):
 df = pd.read_parquet(config.CVES_PARQUET).set_index("cve")
 cves = sorted(c for c in tinker_text if c in df.index)
 rng = np.random.default_rng(0)
-sample = sorted(rng.choice(cves, size=min(a.n, len(cves)), replace=False))
+sample = sorted(rng.choice(cves, size=min(a.n or 300, len(cves)), replace=False))
 rows = df.loc[sample].reset_index()
 rows["description"] = rows.description.fillna("")
 

@@ -43,6 +43,11 @@ def create_app(feed: Feed | None = None, scan_kwargs: dict | None = None,
     async def lifespan(_app):
         if download and state["feed"] is None:
             state["release"] = await asyncio.to_thread(download_latest_release)
+            tag_file = config.FEED / "release_tag.txt"
+            if state["release"] is None and tag_file.exists():  # GitHub unreachable: serving the baked/local feed
+                state["release"] = tag_file.read_text().strip() + " (local copy)"
+        if state["feed"] is None:  # load the ~0.5 GB feed before taking traffic, not on the first health check
+            state["feed"] = await asyncio.to_thread(Feed)
         yield
 
     app = FastAPI(title="Patch Sloth", description="A second opinion on CNA-only CVSS scores. Estimates, not "
@@ -59,7 +64,8 @@ def create_app(feed: Feed | None = None, scan_kwargs: dict | None = None,
     def health():
         f = get_feed()
         return {"status": "ok", "data_as_of": f.data_as_of, "feed_rows": 0 if f.df is None else len(f.df),
-                "model": f.meta.get("model"), "feed_release": state["release"], "llm_backend": config.LLM_BACKEND}
+                "model": f.meta.get("model"), "feed_release": state["release"], "llm_backend": config.LLM_BACKEND,
+                "scan_engine": config.SCAN_ENGINE}
 
     @app.post("/scan", dependencies=[Depends(limit)])
     async def scan(request: Request, file: UploadFile | None = File(None), text: str | None = Form(None),
@@ -82,6 +88,8 @@ def create_app(feed: Feed | None = None, scan_kwargs: dict | None = None,
             return service.run(content, name, get_feed(), **opts)
         except (ValueError, UnicodeDecodeError) as e:
             raise HTTPException(400, f"could not parse lockfile: {e}") from e
+        except FileNotFoundError as e:  # no osv-scanner DB and no advisory index in this deployment
+            raise HTTPException(503, f"scanner unavailable: {e}") from e
 
     @app.get("/cve/{cve_id}", dependencies=[Depends(limit)])
     def cve(cve_id: str):

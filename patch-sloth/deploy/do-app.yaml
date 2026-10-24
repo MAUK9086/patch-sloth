@@ -3,8 +3,7 @@
 # Create with the console (Create App -> import spec) or `doctl apps create --spec deploy/do-app.yaml`. [HUMAN]
 # The repo root holds the project in patch-sloth/, so source_dir (= Docker build context) is patch-sloth and
 # dockerfile_path is relative to the repo root.
-# Secrets: fill PAPERINSTRUMENTS_API_KEY (and, for Option A, VLLM_BASE_URL / VLLM_API_KEY) in the console; App
-# Platform encrypts SECRET values on first submit. Never commit real values here.
+# Secrets are added in the console (type SECRET / "Encrypt"), never committed here.
 name: patch-sloth
 region: nyc                      # GPU Droplets (Option A) run in NYC2/TOR1/ATL1; keep the app close to them
 services:
@@ -17,16 +16,18 @@ services:
     dockerfile_path: patch-sloth/deploy/Dockerfile
     http_port: 8080
     instance_count: 1
-    # ~0.6 GB RSS with the feed loaded (measured locally) + osv-scanner's in-memory DB: 1 GB is too tight
+    # 0.58 GB RSS with the feed loaded (measured locally, 2026-10-24); osv-scanner (opt-in) adds ~0.6 GB per scan.
+    # 1 GB would leave no headroom for pandas during a scan.
     instance_size_slug: apps-s-1vcpu-2gb
+    # The feed (~0.5 GB in memory) loads before uvicorn accepts traffic; allow ~2.5 min for a slow cold start
     health_check:
       http_path: /health
-      initial_delay_seconds: 20
+      initial_delay_seconds: 30
       period_seconds: 10
-      timeout_seconds: 5
-      failure_threshold: 6
+      timeout_seconds: 10
+      failure_threshold: 12
     envs:
-      - key: PATCHSLOTH_FEED_REPO        # feed + HGB fallback come from this repo's newest feed-* release
+      - key: PATCHSLOTH_FEED_REPO        # the image bakes feed-2026-10-23; a newer feed-* release is fetched at boot
         value: MAUK9086/patch-sloth
         scope: RUN_TIME
         type: GENERAL
@@ -34,19 +35,16 @@ services:
         value: "1"
         scope: RUN_TIME
         type: GENERAL
+      - key: PATCHSLOTH_SCAN_ENGINE      # fallback = baked GHSA index (instant); osv = osv-scanner (~30 s/scan)
+        value: fallback
+        scope: RUN_TIME
+        type: GENERAL
       - key: PATCHSLOTH_LLM_BACKEND      # Option B: null (feed vectors only). Option A: vllm
         value: "null"
         scope: RUN_TIME
         type: GENERAL
-      - key: PAPERINSTRUMENTS_API_KEY    # report writer; without it the template report is used
-        scope: RUN_TIME
-        type: SECRET
-      - key: VLLM_BASE_URL               # Option A only, e.g. http://<droplet-ip>:8000/v1
-        scope: RUN_TIME
-        type: SECRET
-      - key: VLLM_API_KEY                # Option A only; same value as on the Droplet
-        scope: RUN_TIME
-        type: SECRET
+      # Secrets are NOT in this file: add PAPERINSTRUMENTS_API_KEY (and for the GPU window VLLM_BASE_URL,
+      # VLLM_API_KEY) in the console as Encrypted (deploy/DEPLOY_STEPS.md, deploy/RUNBOOK.md)
 ingress:
   rules:
     - component:

@@ -33,6 +33,9 @@ THRESHOLDS_FILE = RESULTS / "thresholds.json"
 FEED_REPO = os.environ.get("PATCHSLOTH_FEED_REPO", "MAUK9086/patch-sloth")
 FEED_DOWNLOAD = os.environ.get("PATCHSLOTH_FEED_DOWNLOAD", "1").strip().lower() not in ("0", "false", "no", "off")
 FEED_ASSETS = ("second_opinion.parquet", "latest.csv", "meta.json", "bump_hgb.joblib")
+# scanner: auto (osv-scanner if installed, else the GHSA index) | osv | fallback. The deployed app uses fallback:
+# an offline osv-scanner run reloads its npm DB per request (~30 s, ~0.6 GB measured; DECISIONS.md 2026-10-25)
+SCAN_ENGINE = os.environ.get("PATCHSLOTH_SCAN_ENGINE", "auto").strip().lower() or "auto"
 
 
 def thresholds() -> dict:

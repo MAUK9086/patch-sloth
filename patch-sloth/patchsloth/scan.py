@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -215,9 +216,12 @@ def parse_osv_json(j: dict) -> list[Finding]:
     return out
 
 
+_OSV_SLOTS = threading.Semaphore(1)  # one osv-scanner process at a time: each one loads its DB (~0.6 GB)
+
+
 def run_osv(lockfile: Path, offline: bool = True) -> list[Finding]:
     """osv-scanner v2 on one lockfile. Exit code 1 means 'vulnerabilities found', not failure."""
-    with tempfile.TemporaryDirectory() as td:
+    with _OSV_SLOTS, tempfile.TemporaryDirectory() as td:
         out = Path(td) / "osv.json"
         cmd = ["osv-scanner", "scan", "source", "--format", "json", "--output-file", str(out), "-L", str(lockfile)]
         if offline:

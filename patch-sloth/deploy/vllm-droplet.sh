@@ -15,6 +15,8 @@ VLLM_VERSION="${VLLM_VERSION:-0.31.0}"      # released 2026-10-05; tinker-cookbo
 BASE_MODEL="Qwen/Qwen3-8B"
 ADAPTER_DIR="${ADAPTER_DIR:-$PWD/peft_adapter}"
 PORT="${PORT:-8000}"
+# 0.5 of a 48 GB GPU = 24 GB: Qwen3-8B bf16 (~16.4 GB) + KV cache, leaving ~24 GB for TabPFN in the same session
+GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.5}"
 : "${VLLM_API_KEY:?set VLLM_API_KEY (any long random string; the app uses the same value)}"
 
 nvidia-smi --query-gpu=name,memory.total --format=csv
@@ -30,8 +32,11 @@ export PATH="$HOME/.local/bin:$PATH"
 uv pip install "vllm==${VLLM_VERSION}" tinker tinker-cookbook pandas pyarrow python-dotenv openai
 
 # VERIFY the serve flags on the installed version before relying on them
-vllm serve --help=all 2>/dev/null | grep -E -- "--(enable-lora|lora-modules|max-lora-rank|max-model-len|api-key)" \
-  || { echo "vllm serve flags differ from this script: check 'vllm serve --help=all'"; exit 1; }
+HELP=$(vllm serve --help=all 2>/dev/null || true)
+for flag in --enable-lora --lora-modules --max-lora-rank --max-model-len --api-key --gpu-memory-utilization; do
+  grep -q -- "$flag" <<<"$HELP" || { echo "vllm serve has no $flag in this version: check 'vllm serve --help=all'"; exit 1; }
+done
+echo "vllm serve flags verified"
 
 if [ ! -f "$ADAPTER_DIR/adapter_config.json" ]; then
   : "${TINKER_API_KEY:?set TINKER_API_KEY to download the LoRA (or copy peft_adapter/ here)}"
@@ -47,6 +52,7 @@ nohup vllm serve "$BASE_MODEL" \
   --max-lora-rank "$RANK" \
   --max-model-len 2048 \
   --dtype bfloat16 \
+  --gpu-memory-utilization "$GPU_MEM_UTIL" \
   --host 0.0.0.0 --port "$PORT" \
   --api-key "$VLLM_API_KEY" > vllm.log 2>&1 &
 echo "vLLM starting (pid $!); log: $PWD/vllm.log"
