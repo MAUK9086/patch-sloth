@@ -200,7 +200,10 @@ computed number is an estimate.
 ## If the window can't happen
 
 The draft keeps the fallback sentence (post/draft.md §7):
-> "Weights exported in PEFT format, servable with vLLM (template parity 200/200 checked); end-to-end parity not
-> measured due to time."
+> "LoRA weights downloaded from Tinker in PEFT format; vLLM's chat template matches the training prompt (200/200
+> checked). The vLLM conversion and end-to-end parity were not run, for lack of time."
+
+The download step was done on the laptop (`results/peft_export.json`). The conversion for vLLM was not: it needs
+Qwen3-8B's 16 GB of safetensors, and the laptop ran out of memory.
 
 The error sample stays the HGB + LLM stack version.

@@ -1,0 +1,19 @@
+{
+ "tinker_path": "tinker://a6f950f3-e374-5e28-8fe0-dbbbbaa1742c:train:0/sampler_weights/patchsloth-taskA-final",
+ "downloaded_at": "2026-10-25 03:02 (laptop local time)",
+ "step_downloaded": true,
+ "step_peft_for_vllm": false,
+ "adapter_model_safetensors": {
+  "bytes": 369216072,
+  "sha256": "d1acda9d3b3469bd7a5682429bdf2a08d3a0d444eb728d2526e0213e4593471b"
+ },
+ "config": {
+  "peft_type": "LORA",
+  "r": 32,
+  "lora_alpha": 32,
+  "target_modules": "all-linear",
+  "task_type": "CAUSAL_LM",
+  "peft_version": "0.18.1"
+ },
+ "note": "tinker_cookbook.weights.download worked (it uses a deprecated Tinker endpoint and printed a warning). weights.build_lora_adapter was not completed: it needs Qwen/Qwen3-8B's safetensors (~16 GB) from Hugging Face, and Claude Code stopped the job for low system memory after 2.4 GB. The adapter files are not committed (adapter_raw/ is gitignored). deploy/RUNBOOK.md step 2 redoes both steps on the GPU Droplet."
+}

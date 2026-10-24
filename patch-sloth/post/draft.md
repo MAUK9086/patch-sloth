@@ -240,12 +240,13 @@ between the two was run. [`results/error_sample.md`, `final_table.md` §2]
 Facts to draw on:
 - The model is an open-weight 8B model (Qwen3-8B) with a LoRA adapter, trained on 30,000 public NVD decisions for
   $3.37. [`results/costs.jsonl`]
-- [PENDING: export running] The adapter is downloaded from Tinker and converted to the standard PEFT format that
-  vLLM serves [`results/peft_export.json`]. The prompt that vLLM's chat template builds is token-for-token the same as the
+- The trained LoRA adapter (rank 32, 369 MB, PEFT LoRA format) was downloaded from Tinker
+  [`results/peft_export.json`]. The prompt that vLLM's chat template builds is token-for-token the same as the
   training prompt (200 of 200 CVEs checked). [DECISIONS.md, 2026-10-24]
 - End-to-end vLLM parity with Tinker's outputs: [TODO: `results/vllm_parity.json` from the GPU window. If the window
-  doesn't happen: "Weights exported in PEFT format, servable with vLLM (template parity 200/200 checked);
-  end-to-end parity not measured due to time."]
+  doesn't happen: "LoRA weights downloaded from Tinker in PEFT format; vLLM's chat template matches the training
+  prompt (200/200 checked). The vLLM conversion and end-to-end parity were not run, for lack of time."
+  (Not "exported for vLLM": that conversion step was not completed; see `results/peft_export.json`.)]
 - Scoring the whole unanalysed backlog of 58,457 CVEs cost $2.57 on Tinker. [`final_table.md` §6]
 - The feed is open: `latest.csv` and `second_opinion.parquet` are assets of a public GitHub release.
 
