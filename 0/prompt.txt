@@ -1,0 +1,19 @@
+<pasted_content id="5350">
+Decisions: Option B now (App Platform only). If the app is live by ~10:30 IST tomorrow, we'll do one Option A GPU window (max 2.5h) using deploy/RUNBOOK.md. The GPU workstation is no longer accessible.
+
+While I sleep (CPU only, keep memory use low):
+
+1. Error analysis on CPU: change scripts/10_error_analysis.py to draw the 40-case sample from the HGB + LLM-features stack (committed LLM predictions, same 2026 eval rows). Note in results/error_sample.md and DECISIONS.md: "sample drawn from HGB+LLM stack (PR-AUC tied with served TabPFN stack, see final_table.md); served-model per-row predictions unavailable after workstation access ended." Generate error_sample.md with empty Tag: lines for me.
+
+2. VulDB sanity check: put 5 example VulDB CVEs behind the 77% bump-rate figure (description, VulDB vector, NVD vector) in results/vuldb_check.md.
+
+3. Deploy readiness for App Platform: review deploy/Dockerfile and deploy/do-app.yaml for anything likely to fail in DO's build (image size, memory at startup, feed download, port, health check). Fix what you can without running Docker. Write deploy/DEPLOY_STEPS.md with the exact console clicks for the morning.
+
+4. GPU runbook: write deploy/RUNBOOK.md for one Droplet session, max 2.5h, in this order: set up vLLM with the LoRA, run 12_vllm_parity.py, rebuild the M4 per-row stack predictions (TabPFN needs my own TABPFN_TOKEN), rerun 10_error_analysis.py on the served model, measure latency (p50/p95 over 100 single-CVE requests), commit and push, then destroy the Droplet. Include a firewall/API-key step for port 8000 and logging of Droplet start and stop times for the cost table. Every command copy-pasteable.
+
+5. Parity fallback: if the GPU window doesn't happen, the draft says: weights exported in PEFT format, servable with vLLM (template parity 200/200 checked), end-to-end parity not measured due to time.
+
+6. Post: in post/draft.md, write clear factual prose for the technical sections only (problem evidence, data, methods, results, what went wrong, limitations, partner sections, costs), using only numbers from results/ with source files cited. Keep my parts ([AHMAD: hook, who it's for, why I built it, personal voice]) as placeholders. Short paragraphs, no hype, no AI-jargon.
+
+Run pytest, commit, push. Don't create any cloud resources.
+</pasted_content id="5350">

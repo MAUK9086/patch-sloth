@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.11.6",
+  "checkpoint_id": "01M5QX4AAB85HD2DD4DHWZ5AW1",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "patch-sloth/deploy/DEPLOY_STEPS.md",
+    "patch-sloth/deploy/RUNBOOK.md",
+    "patch-sloth/deploy/vllm-droplet.sh",
+    "patch-sloth/patchsloth/api.py",
+    "patch-sloth/post/draft.md",
+    "patch-sloth/scripts/10_error_analysis.py",
+    "patch-sloth/scripts/18_vuldb_check.py",
+    "patch-sloth/tests/test_deploy_config.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 110,
+    "cache_creation_tokens": 368820,
+    "cache_read_tokens": 18540542,
+    "output_tokens": 78385,
+    "api_call_count": 55,
+    "subagent_tokens": {
+      "input_tokens": 6,
+      "cache_creation_tokens": 46146,
+      "cache_read_tokens": 43542,
+      "output_tokens": 834,
+      "api_call_count": 3
+    }
+  }
+}
