@@ -236,7 +236,7 @@ of a fully trained HistGBT with 1/16 of the labels. It ran on a local GPU at no 
 $0.0077 each. It was also the frontier zero-shot baseline: $0.092 per 1,000 CVEs, and less accurate than copying
 the CNA. Total logged spend was $0.11. [AHMAD]
 
-**Entire.** Every Claude Code session that built this repo is stored as an Entire checkpoint in the public repo
+**Entire.** Every Claude Code session that built this repo is stored as an Entire checkpoint in the public repo.
 [AHMAD: session links]
 
 ## Costs
