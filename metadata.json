@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.6",
+  "checkpoint_id": "01M5T9BZGWBMFNJWVWPB1XFYXG",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "patch-sloth/post/final.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2,
+    "cache_creation_tokens": 1611,
+    "cache_read_tokens": 428485,
+    "output_tokens": 359,
+    "api_call_count": 1
+  }
+}
