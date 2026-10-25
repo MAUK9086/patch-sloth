@@ -1,0 +1,13 @@
+<pasted_content id="5350">
+Deadline is 12:29 IST today. We're cutting the GPU window entirely. DO deploy is optional and happens only after publishing.
+
+Turn post/draft.md into a DEV-ready post, post/final.md:
+- First line: the challenge submission line for "Hacktoberfest Open-Source AI Challenge: Week 3" (if DevRelay is installed, fetch the official submission template and follow it).
+- Chart images as absolute raw.githubusercontent.com URLs from the pushed repo (master), so they render on DEV.
+- Sections in order: hook [AHMAD], problem with evidence + sources, who it's for [AHMAD], what I built (architecture as a simple text diagram, demo: socket.io report excerpt from results/demo), how I know it works (headline 75% (281/376) vs 9.5%, Tinker table, TabPFN learning curve + gate result with both pre-specified rules, Ultramarine 1k comparison with cost), why open matters [AHMAD + facts], what went wrong (3 bugs), limitations (include the parity line as written), prize categories (Tinker, TabPFN, Ultramarine, Entire only; DigitalOcean only if I tell you it's deployed), costs table, credits/prior work, links (repo, entire/checkpoints/v1 branch, feed release).
+- Keep [AHMAD: ...] placeholders where personal text goes.
+- Max ~2,500 words. Short paragraphs, no hype.
+- Tags line suggestion: hf26challenge, ai, opensource, security.
+Also cut results/error_sample.md to a 10-case version (results/error_sample_10.md) with Tag: lines.
+Commit and push. Then tell me the word count.
+</pasted_content id="5350">
