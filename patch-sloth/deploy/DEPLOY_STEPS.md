@@ -18,7 +18,7 @@ values are exact.
 ## 0. Before you start (laptop, 1 min)
 
 ```bash
-cd ~/Downloads/TECH_PROJECTS/hacktoberFestweek3/patch-sloth
+cd /path/to/patch-sloth   # repo root
 git pull && git log -1 --oneline     # the commit that added deploy/DEPLOY_STEPS.md, or newer
 date -u +%FT%TZ                      # note this: app creation time, for the cost table
 ```

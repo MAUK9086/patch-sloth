@@ -4,11 +4,20 @@ NIST no longer analyses every CVE. Since April 2026, many CVEs are marked **Defe
 
 Patch Sloth reads your lockfile and finds the vulnerabilities NIST never checked. For each one it says whether an independent reviewer would likely rate it higher, and it writes you a one-minute patch list.
 
+**Status:** working prototype, built for the DEV Hacktoberfest 2026 Open-Source AI Challenge (week 3) and not submitted. The models, evaluation, CLI, web page and second-opinion feed are complete; 113 tests pass. It runs locally and is not hosted. The full technical write-up is [`docs/WRITEUP.md`](docs/WRITEUP.md); `post/` holds the unfinished DEV post drafts.
+
+## Results
+Evaluated on 8,000 CVEs from 2026, split by date from the training data (`results/final_table.md`):
+- When Patch Sloth said "likely under-rated", NIST had raised the score **75% of the time (281 of 376)**, against a 9.5% base rate. The cut-off is label-free (top 10% of scores over Deferred CVEs).
+- Ranking the CVEs NVD would raise: PR-AUC **0.621** for the TabPFN-3.5 + LLM stack, against 0.095 for copying the CNA. HistGBT on all 80,098 training rows (0.627) and TabPFN-3.5 alone on 50k rows (0.631) are not significantly different; TabPFN's advantage is sample efficiency.
+- A fine-tuned Qwen3-8B predicts NVD's vector better than copying the CNA on 2025 data (severity accuracy 0.869 vs 0.722) but not on 2026 data (0.859 vs 0.880). A gate tuned on late 2025 makes the system 2.0 points more accurate than copying the CNA on 2026.
+- The whole unanalysed backlog (58,457 CVEs) is scored in the open feed, release [`feed-2026-10-23`](https://github.com/MAUK9086/patch-sloth/releases/tag/feed-2026-10-23). Total metered cost of the project: about $8.26.
+
 ## Stack
-- **Tinker:** fine-tunes Qwen3-8B to produce the "second opinion" CVSS vector.
-- **TabPFN:** predicts the probability that the severity band gets bumped up.
-- **DigitalOcean:** serves the model, the app, and the weekly scan.
-- **Ultramarine 1 Flash:** writes the report.
+- **Tinker:** fine-tunes Qwen3-8B (LoRA) to produce the "second opinion" CVSS vector.
+- **TabPFN:** predicts the probability that the severity band gets bumped up (HistGBT is the CPU fallback).
+- **Ultramarine 1 Flash:** writes the report, behind a guardrail that checks every CVE ID and number.
+- **Deployment configs** (`deploy/`): Dockerfile, DigitalOcean App Platform spec and a vLLM runbook. These were prepared but not deployed.
 
 ## Reproduce
 CPU-only, works on Windows, macOS and Linux. Run everything from this folder.

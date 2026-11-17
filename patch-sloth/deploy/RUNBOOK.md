@@ -11,7 +11,7 @@ it. Everything runs **on the Droplet against localhost**. Port 8000 is open only
 internet.
 
 Conventions:
-- **[laptop]** blocks run in Git Bash in `~/Downloads/TECH_PROJECTS/hacktoberFestweek3/patch-sloth`.
+- **[laptop]** blocks run in Git Bash in the repo root (`patch-sloth/`).
 - **[droplet]** blocks run in the SSH session.
 - Secrets are typed at hidden `read -s` prompts, so they never land in shell history or files.
 
